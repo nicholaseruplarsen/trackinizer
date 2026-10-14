@@ -39,7 +39,9 @@ def _started(minutes: float) -> SessionRecord:
     )
 
 
-def _complete(minutes: float, *, error: str | None = None, code: str = "other") -> SessionRecord:
+def _complete(
+    minutes: float, *, error: str | None = None, code: str = "other"
+) -> SessionRecord:
     payload: dict[str, object] = {"turn_id": "t", "last_agent_message": "done"}
     if error is not None:
         payload = {
@@ -59,7 +61,9 @@ class _Store:
     records: list[SessionRecord] = field(default_factory=list)
     labels: list[tuple[str, bool]] = field(default_factory=list)
 
-    async def read_session_manifests(self, session_id: uuid.UUID) -> list[SessionManifest]:
+    async def read_session_manifests(
+        self, session_id: uuid.UUID
+    ) -> list[SessionManifest]:
         del session_id
         return [
             SessionManifest(
@@ -83,7 +87,9 @@ class _Store:
     ) -> list[SessionRecordRow]:
         del plaintext_only
         return [
-            SessionRecordRow.of(session_id=session_id, part=part, idx=idx, record=record)
+            SessionRecordRow.of(
+                session_id=session_id, part=part, idx=idx, record=record
+            )
             for idx, record in enumerate(self.records)
             if idx > after_idx
         ][:limit]
@@ -97,15 +103,21 @@ class _Store:
         self.labels.append((label, False))
 
 
-def _setup(records: list[SessionRecord]) -> tuple[SupervisorService, _Store, InboundQueue]:
+def _setup(
+    records: list[SessionRecord],
+) -> tuple[SupervisorService, _Store, InboundQueue]:
     store = _Store(records=records)
     inbound = InboundQueue(poller_ttl_sec=1e9)
     inbound.mark_poller(_SESSION)
     return SupervisorService(Supervisor.Config()), store, inbound
 
 
-async def _sweep(service: SupervisorService, store: _Store, inbound: InboundQueue, minutes: float) -> None:
-    await service.sweep(cast(Store, store), inbound, now=_T0 + timedelta(minutes=minutes))
+async def _sweep(
+    service: SupervisorService, store: _Store, inbound: InboundQueue, minutes: float
+) -> None:
+    await service.sweep(
+        cast(Store, store), inbound, now=_T0 + timedelta(minutes=minutes)
+    )
 
 
 @pytest.mark.asyncio
@@ -144,7 +156,10 @@ async def test_a_streak_stops_after_its_backoffs_are_spent() -> None:
         minute += 20
         await _sweep(service, store, inbound, minute)
         inbound.drain(_SESSION)
-        store.records += [_started(minute), _complete(minute + 0.5, error="network error")]
+        store.records += [
+            _started(minute),
+            _complete(minute + 0.5, error="network error"),
+        ]
         minute += 0.5
         await _sweep(service, store, inbound, minute)
     assert service.watches[_SESSION].resumes == len(Supervisor.Config().backoff_sec)
@@ -172,7 +187,12 @@ async def test_a_usage_limit_resumes_after_it_lifts() -> None:
 @pytest.mark.asyncio
 async def test_a_permanent_error_is_labelled_but_never_resumed() -> None:
     service, store, inbound = _setup(
-        [_started(0), _complete(1, error="context window exceeded", code="context_window_exceeded")],
+        [
+            _started(0),
+            _complete(
+                1, error="context window exceeded", code="context_window_exceeded"
+            ),
+        ],
     )
     await _sweep(service, store, inbound, 2)
     await _sweep(service, store, inbound, 200)
@@ -194,6 +214,11 @@ def test_retry_after_reads_codex_usage_message() -> None:
         "purchase more credits or try again at Oct 14th, 2026 12:39 PM."
     )
     assert retry_after(message, tz=timedelta(hours=2)) == datetime(
-        2026, 10, 14, 10, 39, tzinfo=UTC,
+        2026,
+        10,
+        14,
+        10,
+        39,
+        tzinfo=UTC,
     )
     assert retry_after("no time here") is None

@@ -23,9 +23,8 @@ It needs nothing from the server beyond the record and inquiry reads every
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 import time
 import uuid
@@ -34,7 +33,12 @@ from treekle import PlainTree, from_plain
 
 from trackinizer.lib.agent.turns import TurnState, latest_turn
 from trackinizer.wire.filters import Filter
-from trackinizer.wire.wire_session_ir import PartBody, RecordBody
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from trackinizer.wire.wire_session_ir import PartBody, RecordBody
 
 
 __all__ = [
@@ -278,7 +282,7 @@ def wait_for_turn(
 
 
 def _newest_part(client: WaitClient, session_id: uuid.UUID) -> tuple[int, int]:
-    """The session's newest part and how many records it holds."""
+    """Return the session's newest part and how many records it holds."""
     parts = client.read_session_parts(session_id)
     if not parts:
         return 0, 0

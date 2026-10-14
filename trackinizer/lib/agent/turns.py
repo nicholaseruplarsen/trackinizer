@@ -101,7 +101,9 @@ _TRANSIENT_MARKERS = (
 )
 
 # Codex error classes that say outright whether a retry can help.
-_TRANSIENT_CODES = frozenset({"server_overloaded", "stream_error", "internal_server_error"})
+_TRANSIENT_CODES = frozenset(
+    {"server_overloaded", "stream_error", "internal_server_error"}
+)
 _PERMANENT_CODES = frozenset(
     {"usage_limit_exceeded", "context_window_exceeded", "unauthorized", "bad_request"},
 )
@@ -150,7 +152,7 @@ def latest_turn(records: Sequence[object]) -> TurnState:
 
 
 def _boundary(records: Sequence[object], index: int) -> TurnState | None:
-    """The turn state record ``index`` decides, or None if it decides none."""
+    """Return the turn state record ``index`` decides, or None if it decides none."""
     record = records[index]
     if isinstance(record, UncategorizedRecord):
         return _codex_boundary(record, index)
@@ -170,7 +172,7 @@ def _boundary(records: Sequence[object], index: int) -> TurnState | None:
 
 
 def _codex_boundary(record: UncategorizedRecord, index: int) -> TurnState | None:
-    """The turn state one codex bracket record decides."""
+    """Return the turn state one codex bracket record decides."""
     payload = record.payload
     if record.kind == "event_msg/task_started":
         return TurnState(phase="running", index=index, started=index)
@@ -205,7 +207,7 @@ def _codex_boundary(record: UncategorizedRecord, index: int) -> TurnState | None
 
 
 def _claude_reply(record: AssistantMessage, index: int) -> TurnState | None:
-    """The turn state one claude assistant message decides."""
+    """Return the turn state one claude assistant message decides."""
     extra = record.extra
     if "isApiErrorMessage" in extra:
         return TurnState(
@@ -226,7 +228,7 @@ def _claude_reply(record: AssistantMessage, index: int) -> TurnState | None:
 
 
 def _last_assistant_text(records: Sequence[object], before: int) -> str | None:
-    """The newest assistant prose at or before ``before``."""
+    """Return the newest assistant prose at or before ``before``."""
     for index in range(before, -1, -1):
         record = records[index]
         if isinstance(record, AssistantMessage) and record.content:

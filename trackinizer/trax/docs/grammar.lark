@@ -155,7 +155,7 @@ group_create: KIND (inline_field | cost_action | safe_meta | EDGE edge_meta)+ (e
 
 // ---- terminals (keyword sets; spellings overlap across classes, e.g.
 // codechange is KIND+REF_LIST_FIELD, resolved by position) ----
-VERB: "search-sessions" | "confidence" | "authority" | "workspace" | "blocked" | "machine" | "profile" | "version" | "export" | "recent" | "board" | "graph" | "cost" | "help" | "next" | "send" | "env" | "run" | "id"
+VERB: "search-sessions" | "confidence" | "authority" | "workspace" | "blocked" | "machine" | "profile" | "version" | "export" | "recent" | "board" | "graph" | "cost" | "help" | "next" | "send" | "wait" | "env" | "run" | "id"
 KIND: "agentsession" | "codechange" | "experiment" | "webresult" | "websearch" | "artifact" | "belief" | "issue" | "paper"
 EDGE_KEYWORD: "disfavored_by" | "superseded_by" | "broadened_by" | "disproved_by" | "narrowed_by" | "produced_by" | "required_by" | "blocked_by" | "favored_by" | "supersedes" | "disfavors" | "disproves" | "proved_by" | "broadens" | "cited_by" | "produced" | "produces" | "requires" | "narrows" | "blocks" | "favors" | "proves" | "cites"
 FIELD: "google_scholar_cluster_id" | "google_scholar_cites_id" | "publication_type" | "cli_session_id" | "publish_date" | "description" | "confidence" | "validation" | "judgement" | "abstract" | "priority" | "provider" | "subvenue" | "account" | "outcome" | "started" | "config" | "source" | "status" | "owner" | "query" | "title" | "venue" | "cli" | "sha" | "url"
@@ -248,8 +248,9 @@ VERB_ARG: /\S+/
 //   run send NAME TEXT...
 //   run stop NAME
 //   search-sessions QUERY [--limit V] [--semantic/--no-semantic] [--format text|json]
-//   send TARGET TEXT...
+//   send TARGET TEXT... [--wait V]
 //   version
+//   wait TARGET [--timeout V] [--format text|json]
 //   workspace WORKSPACE_ID [ACTION] [SUBJECT] [--record V] [--placement main|left|side|floating] [--param V]
 //   ^ run --as NAME = the session's owner; doubles as its routing handle
 //     (others address it @NAME), uniquified on collision (scientist#2).

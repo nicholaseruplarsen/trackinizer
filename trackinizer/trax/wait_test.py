@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import uuid
-
-from treekle import PlainTree
 
 from trackinizer.lib.agent.types.sessions import (
     AssistantMessage,
@@ -17,8 +15,15 @@ from trackinizer.lib.agent.types.sessions import (
 )
 from trackinizer.lib.agent.types.stored import to_stored
 from trackinizer.trax.wait import mark, wait_for_turn
-from trackinizer.wire.filters import Filter
 from trackinizer.wire.wire_session_ir import PartBody, RecordBody
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from treekle import PlainTree
+
+    from trackinizer.wire.filters import Filter
 
 
 _SESSION = uuid.UUID("00000000-0000-4000-8000-000000000001")
@@ -28,7 +33,9 @@ def _started() -> SessionRecord:
     return UncategorizedRecord(kind="event_msg/task_started", payload={"turn_id": "t"})
 
 
-def _complete(reply: str | None = "RESULT ok", error: str | None = None) -> SessionRecord:
+def _complete(
+    reply: str | None = "RESULT ok", error: str | None = None
+) -> SessionRecord:
     payload: dict[str, PlainTree] = {"turn_id": "t", "last_agent_message": reply}
     if error is not None:
         payload["error"] = {"message": error, "codex_error_info": "other"}
@@ -83,7 +90,11 @@ class _Client:
     def read_session_parts(self, session_id: uuid.UUID) -> list[PartBody]:
         self._arrive()
         assert session_id == _SESSION
-        return [PartBody(part=0, name="rollout.jsonl", format="codex", records=len(self.records))]
+        return [
+            PartBody(
+                part=0, name="rollout.jsonl", format="codex", records=len(self.records)
+            )
+        ]
 
     def read_session_records(
         self,
@@ -111,7 +122,9 @@ def test_reply_after_a_send_is_returned() -> None:
         (6.0, _started()),
         (90.0, _complete("RESULT 01ab")),
     ]
-    result = wait_for_turn(client, "forecaster", since=before, clock=clock, sleep=clock.sleep)
+    result = wait_for_turn(
+        client, "forecaster", since=before, clock=clock, sleep=clock.sleep
+    )
     assert result.outcome == "reply"
     assert result.text == "RESULT 01ab"
     assert result.exit_code == 0
@@ -143,7 +156,9 @@ def test_a_cut_stream_returns_a_transient_error() -> None:
         (3.0, _started()),
         (40.0, _complete(None, error="stream disconnected before completion")),
     ]
-    result = wait_for_turn(client, "forecaster", since=before, clock=clock, sleep=clock.sleep)
+    result = wait_for_turn(
+        client, "forecaster", since=before, clock=clock, sleep=clock.sleep
+    )
     assert result.outcome == "error"
     assert result.transient
     assert result.exit_code == 3
@@ -170,7 +185,9 @@ def test_a_session_that_ends_mid_turn_is_reported() -> None:
     client = _Client(clock, ended_at=30.0)
     before = mark(client, "forecaster")
     client.arrivals = [(3.0, _started())]
-    result = wait_for_turn(client, "forecaster", since=before, clock=clock, sleep=clock.sleep)
+    result = wait_for_turn(
+        client, "forecaster", since=before, clock=clock, sleep=clock.sleep
+    )
     assert result.outcome == "ended"
 
 
@@ -201,9 +218,13 @@ def test_claude_reply_counts_too() -> None:
         (2.0, UserMessage(content="go")),
         (
             20.0,
-            AssistantMessage(content="done", extra={"message": {"stop_reason": "end_turn"}}),
+            AssistantMessage(
+                content="done", extra={"message": {"stop_reason": "end_turn"}}
+            ),
         ),
     ]
-    result = wait_for_turn(client, "forecaster", since=before, clock=clock, sleep=clock.sleep)
+    result = wait_for_turn(
+        client, "forecaster", since=before, clock=clock, sleep=clock.sleep
+    )
     assert result.outcome == "reply"
     assert result.text == "done"

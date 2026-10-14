@@ -29,6 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import asyncio
 import logging
@@ -42,8 +43,6 @@ from trackinizer.server.inbound import Inbound
 
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from trackinizer.server.inbound import InboundQueue
     from trackinizer.server.store.core import Store
 
@@ -70,7 +69,9 @@ _RETRY_AT = re.compile(
 )
 
 
-def retry_after(message: str | None, *, tz: timedelta = timedelta(0)) -> datetime | None:
+def retry_after(
+    message: str | None, *, tz: timedelta = timedelta(0)
+) -> datetime | None:
     """Read when a usage limit lifts from its error message.
 
     Codex states the time in the user's local zone without naming it, so the
@@ -88,7 +89,7 @@ def retry_after(message: str | None, *, tz: timedelta = timedelta(0)) -> datetim
     if found is None:
         return None
     hour = int(found["hour"]) % 12 + (12 if found["ampm"] == "PM" else 0)
-    local = datetime.strptime(
+    local = datetime.strptime(  # noqa: DTZ007 -- a wall time in the stated tz
         f"{found['year']} {found['month']} {found['day']} {hour}:{found['minute']}",
         "%Y %b %d %H:%M",
     )
@@ -167,7 +168,9 @@ class SupervisorService:
                 _LOGGER.exception("supervisor sweep failed; retrying next interval")
             await asyncio.sleep(self.config.interval_sec)
 
-    async def sweep(self, store: Store, inbound: InboundQueue, *, now: datetime) -> None:
+    async def sweep(
+        self, store: Store, inbound: InboundQueue, *, now: datetime
+    ) -> None:
         """Check every polling session once.
 
         Args:
@@ -274,7 +277,7 @@ class SupervisorService:
         return None if lifts is None else lifts + timedelta(minutes=2)
 
     def _resume_text(self, state: TurnState) -> str:
-        """The resume message for one failure."""
+        """Write the resume message for one failure."""
         error = (state.text or state.code or "unknown error").strip()
         if len(error) > 160:
             error = error[:157] + "..."
@@ -298,4 +301,6 @@ class SupervisorService:
                     reason="a later turn succeeded",
                 )
         except Exception:
-            _LOGGER.exception("could not update %s on session %s", FAILED_LABEL, session_id)
+            _LOGGER.exception(
+                "could not update %s on session %s", FAILED_LABEL, session_id
+            )
