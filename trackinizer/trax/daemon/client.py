@@ -109,7 +109,7 @@ def should_delegate(argv: Sequence[str]) -> bool:
     # call there for nothing.
     if os.getenv(KEY_ENV, default="") and os.getenv("TRACKINIZER_URL", default=""):
         return False
-    if _spawns_a_terminal(argv) or _hosts_a_machine(argv):
+    if _spawns_a_terminal(argv) or _hosts_a_machine(argv) or _blocks(argv):
         return False
     return not any(
         token == _STDIN_SENTINEL and argv[index - 1].lower() in _VALUE_OPERATORS
@@ -192,6 +192,16 @@ def _spawns_a_terminal(argv: Sequence[str]) -> bool:
         # Past the verb: a leading ``run`` is the case above, and the tail
         # always sits after a kind and its ref.
         if index > 0
+    )
+
+
+# ``wait`` and ``send --wait`` hold the call until an agent's turn ends, which can
+# take an hour; held in the daemon, they would tie up a worker for all of it.
+def _blocks(argv: Sequence[str]) -> bool:
+    """Whether ``argv`` waits on an agent's turn."""
+    verb = _verb(argv)
+    return verb == "wait" or (
+        verb == "send" and any(token.split("=")[0] == "--wait" for token in argv)
     )
 
 

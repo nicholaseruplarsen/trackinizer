@@ -19,7 +19,7 @@ import uuid
 from treekle import MutablePlainTree, from_plain, json_loads
 
 from trackinizer.client.errors import ClientError
-from trackinizer.trax import render
+from trackinizer.trax import render, wait
 from trackinizer.trax.commands import Command, HelpPage
 from trackinizer.trax.context import cwd, env
 from trackinizer.trax.grammar import (
@@ -2639,17 +2639,20 @@ class Send(Command):
 
     names = ("send",)
     help = """\
-Usage: trax send @ACTOR[:ROOM] TEXT...
+Usage: trax send @ACTOR[:ROOM] TEXT... [--wait SECONDS]
 
 Examples:
   trax send @scientist "check the logs"         message a live session
   trax send @scientist:sear "status?"           scope to a room
   trax send scientist hello                      the @ is optional
+  trax send @forecaster "run H31" --wait 3600   send, then wait for the reply
 
 Notes:
   The target is an AgentSession's routing name (its --as owner). The message
   is injected into the live CLI's input. Delivery is drop-if-absent: if no
   live session matches, nothing is sent and the receipt says so.
+  --wait SECONDS then blocks until the turn the message starts ends, exactly
+  as 'trax wait' does, and exits with its status.
 """
 
     @classmethod
@@ -2658,6 +2661,13 @@ Notes:
         parser = argparse.ArgumentParser(prog="trax send", description=cls.__doc__)
         parser.add_argument("target", help="@actor or @actor:room")
         parser.add_argument("text", nargs="+", help="message body")
+        parser.add_argument(
+            "--wait",
+            type=float,
+            default=None,
+            metavar="SECONDS",
+            help="then wait up to SECONDS for the turn to end",
+        )
         return parser
 
     @classmethod
@@ -2670,7 +2680,12 @@ Notes:
     ) -> None:
         del verb
         actor, room = _parse_target(_arg_str(args, "target"))
-        delivered = client_factory().send_message(
+        client = client_factory()
+        wait_sec = from_plain(_arg_values(args).get("wait"), float, default=None)
+        # Marked before the send, so the wait cannot mistake an earlier reply for
+        # the answer to this message.
+        before = wait.mark(client, actor) if wait_sec is not None else None
+        delivered = client.send_message(
             actor,
             " ".join(_arg_text(args)),
             room=room,
@@ -2678,8 +2693,96 @@ Notes:
         if not delivered:
             scope = f"@{actor}:{room}" if room is not None else f"@{actor}"
             echo(f"undelivered: no live session matches {scope}")
+            if wait_sec is not None:
+                raise SystemExit(wait.EXIT_CODES["no_session"])
             return
         echo(f"sent to {len(delivered)} session(s)")
+        if wait_sec is not None:
+            _report_wait(
+                wait.wait_for_turn(client, actor, since=before, timeout_sec=wait_sec),
+            )
+
+
+class Wait(Command):
+    """Wait for an agent's turn to end, and say how it ended."""
+
+    names = ("wait",)
+    help = """\
+Usage: trax wait @ACTOR [--timeout SECONDS] [--format text|json]
+
+Examples:
+  trax wait @forecaster                         block until its turn ends
+  trax wait @forecaster --timeout 600           give up after ten minutes
+
+Notes:
+  Returns on the first of: reply (exit 0), error (3), aborted (4), the
+  session ended (5), or the timeout (124); no session by that name is 2. A
+  turn that has already ended returns at once. An error says whether it is
+  transient (a cut stream, an overloaded model), which a retry can fix.
+  To wait for the answer to a particular message, use
+  'trax send @ACTOR TEXT --wait SECONDS': it also reports a message the
+  session never picked up (6).
+"""
+
+    @classmethod
+    @override
+    def make_parser(cls) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(prog="trax wait", description=cls.__doc__)
+        parser.add_argument("target", help="@actor")
+        parser.add_argument("--timeout", type=float, default=3600.0)
+        parser.add_argument(
+            "--format",
+            dest="format_",
+            default="text",
+            choices=("text", "json"),
+        )
+        return parser
+
+    @classmethod
+    @override
+    def run(
+        cls,
+        verb: str,
+        args: argparse.Namespace,
+        client_factory: Callable[[], Client],
+    ) -> None:
+        del verb
+        actor, _ = _parse_target(_arg_str(args, "target"))
+        result = wait.wait_for_turn(
+            client_factory(),
+            actor,
+            timeout_sec=from_plain(_arg_values(args).get("timeout"), float),
+        )
+        _report_wait(result, as_json=_arg_str(args, "format_") == "json")
+
+
+def _report_wait(result: wait.WaitResult, *, as_json: bool = False) -> None:
+    """Print how a wait ended and exit with its status."""
+    if as_json:
+        echo(
+            json.dumps(
+                {
+                    "outcome": result.outcome,
+                    "session_id": None
+                    if result.session_id is None
+                    else str(result.session_id),
+                    "text": result.text,
+                    "code": result.code,
+                    "transient": result.transient,
+                    "consumed": result.consumed,
+                    "waited_sec": round(result.waited_sec, 1),
+                },
+            ),
+        )
+    else:
+        detail = ""
+        if result.outcome == "error":
+            detail = " (transient)" if result.transient else " (not transient)"
+        echo(f"{result.outcome}{detail} after {result.waited_sec:.0f}s")
+        if result.text:
+            echo(result.text)
+    if result.exit_code:
+        raise SystemExit(result.exit_code)
 
 
 class Version(Command):

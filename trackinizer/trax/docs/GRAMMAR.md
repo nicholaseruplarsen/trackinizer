@@ -443,7 +443,7 @@ flags documented here.
 ```
 verb_name   ::= "help" | "profile" | "env" | "machine" | "next" | "recent"
              |  "cost" | "confidence" | "authority" | "blocked" | "board"
-             |  "graph" | "id" | "version" | "export" | "send" | "run"
+             |  "graph" | "id" | "version" | "export" | "send" | "wait" | "run"
              |  "search-sessions"
 ```
 
@@ -486,8 +486,14 @@ kinds resolve first, so a field can never shadow a command.
   full-text-only when no session embedder is configured. `--no-semantic` opts
   out. (Named `search-sessions`, not `search`: the bare `search` verb was
   retired when the filter grammar subsumed inquiry search.)
-- `trax send @actor[:room] TEXT...` -- inject a message into a live agent
-  session addressed by its routing name (its `run --as` owner).
+- `trax send @actor[:room] TEXT... [--wait SECONDS]` -- inject a message into
+  a live agent session addressed by its routing name (its `run --as` owner).
+  `--wait` then blocks until the turn it starts ends, as `trax wait` does,
+  and also reports a message the session never picked up.
+- `trax wait @actor [--timeout SECONDS] [--format text|json]` -- block until
+  the actor's current turn ends and report how: `reply` (exit 0), `error`
+  (3, marked transient or not), `aborted` (4), session `ended` (5),
+  `timeout` (124); no such session is 2.
 - `trax run claude|gemini|codex|sh [--out FILE] [--verbose] [--dry-run]
   [--no-sync] [--as NAME] [--room ROOM]... [--detach] [--name NAME]` --
   wrap an agent CLI, tail its session log, and sync turn events. `--as NAME`
