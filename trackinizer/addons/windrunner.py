@@ -12,6 +12,7 @@ from dataclasses import field
 from configgle import Makes
 
 from trackinizer.addons.deployment import Deployment
+from trackinizer.addons.research import Research
 from trackinizer.addons.supervisor import Supervisor
 
 
@@ -23,6 +24,9 @@ class Windrunner(Makes["Deployment"], Deployment.Config):
 
     supervisor: Supervisor.Config | None = field(default_factory=Supervisor.Config)
     """Labels failed agent turns and resumes transient ones; ``None`` turns it off."""
+
+    research: Research.Config | None = field(default_factory=Research.Config)
+    """Audits predictions, ledger drift and Beliefs at /api/addons/research/audit."""
 
 
 def windrunner() -> Windrunner:
