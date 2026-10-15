@@ -12,6 +12,7 @@ from dataclasses import field
 from configgle import Makes
 
 from trackinizer.addons.deployment import Deployment
+from trackinizer.addons.ledger_mirror import LedgerMirror
 from trackinizer.addons.research import Research
 from trackinizer.addons.supervisor import Supervisor
 
@@ -27,6 +28,11 @@ class Windrunner(Makes["Deployment"], Deployment.Config):
 
     research: Research.Config | None = field(default_factory=Research.Config)
     """Audits predictions, ledger drift and Beliefs at /api/addons/research/audit."""
+
+    ledger_mirror: LedgerMirror.Config | None = field(
+        default_factory=LedgerMirror.Config
+    )
+    """Creates one Experiment per ledger row, replacing the post-scoring sync."""
 
 
 def windrunner() -> Windrunner:
