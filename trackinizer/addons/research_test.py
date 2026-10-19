@@ -78,7 +78,9 @@ def test_a_prediction_registered_before_its_result_is_judged() -> None:
     (prediction,) = found.predictions
     assert prediction.observed is not None
     assert abs(prediction.observed - 0.8) < 1e-9
-    assert prediction.verdict == "miss_low"
+    assert prediction.verdict == "miss"
+    assert prediction.direction == "low"
+    assert prediction.source == "ledger"
 
 
 def test_a_prediction_written_after_the_result_is_late() -> None:
@@ -115,8 +117,70 @@ def test_calibration_counts_one_sided_misses() -> None:
     assert calibration.hits == 0
     assert calibration.sign_p is not None
     assert calibration.sign_p < 0.01
-    assert calibration.mean_offset is not None
-    assert calibration.mean_offset < -1
+
+
+def _judged(
+    seq: int, outcome: str, author: str = "a", metric: str = "pnl_eur_mwh"
+) -> Experiment:
+    return Experiment(
+        seq=seq,
+        title=f"PRED {seq}",
+        labels=("prereg",),
+        config={
+            "prediction": {
+                "run_id": f"X{seq}",
+                "pair": "IE/ida1_dah",
+                "metric": metric,
+                "lo": 0.0,
+                "hi": None,
+                "author": author,
+            }
+        },
+        outcome=outcome,
+        created=_T0,
+    )
+
+
+def test_an_agents_written_verdict_is_read_for_any_metric() -> None:
+    experiments = [
+        _judged(1, "HIT: MET adds +0.08 on IE ida1_dah"),
+        _judged(2, "MISS (high): S4 dev +0.41 vs prereg +0.05..+0.35", author="b"),
+        _judged(3, "MISS (low, n.s.): replay -0.08"),
+        _judged(4, "HALF: DE 0.433 HIT, DK1 0.212 MISS"),
+        _judged(5, "9/9 HIT (low-information: near-determined)"),
+        _judged(6, "3 HIT / 4 MISS. GBM-HLG vs P_v5"),
+        _judged(7, "(1) MISS: PC1 = all-day level shift"),
+        _judged(8, "NULL (primary interval HIT, effect MISS)"),
+        _judged(9, ""),
+    ]
+    found = audit([], experiments, [], now=_T0)
+    verdicts = [(p.verdict, p.direction) for p in found.predictions]
+    assert verdicts == [
+        ("hit", None),
+        ("miss", "high"),
+        ("miss", "low"),
+        ("half", None),
+        ("hit", None),
+        ("half", None),
+        ("miss", None),
+        ("null", None),
+        ("pending", None),
+    ]
+    calibration = found.calibration
+    assert calibration is not None
+    assert (calibration.resolved, calibration.hits, calibration.halves) == (7, 2, 2)
+    assert (
+        calibration.misses_low,
+        calibration.misses_high,
+        calibration.misses_unstated,
+    ) == (1, 1, 1)
+    assert calibration.nulls == 1
+    assert calibration.uninformative == 1
+    assert calibration.by_author["b"] == (0, 0, 1)
+    assert abs(calibration.hit_rate - 3 / 7) < 1e-9
+    text = render(found)
+    assert "hit rate 43%" in text
+    assert "1 direction unstated" in text
 
 
 def test_unmirrored_and_unparented_rows_are_counted() -> None:

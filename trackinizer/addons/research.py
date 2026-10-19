@@ -11,11 +11,13 @@ the ledger and reports each of those, at ``GET /api/addons/research/audit``.
 Conventions it reads, all on existing kinds:
 
 - **Pre-registration.** An Experiment labelled ``prereg`` whose ``config``
-  holds ``prediction``: ``{"run_id", "pair", "metric", "lo", "hi"}`` and
-  optionally ``"parent"`` and ``"window"`` (default ``dev``). ``metric`` is
-  ``skill_pt`` (the run's skill in percentage points) or ``delta_pt`` (its
-  skill minus the parent's). It counts only if the Experiment was created
-  before the ledger row it predicts.
+  holds ``prediction``: usually ``{"run_id", "pair", "metric", "lo", "hi",
+  "author"}``, with any metric and either bound open. Once judged, the agent
+  starts the Experiment's outcome with its verdict (``HIT``, ``HALF``,
+  ``MISS (high)``, ``MISS (low)``, ``NULL``, ``3/4 HIT``). A ``skill_pt`` or
+  ``delta_pt`` prediction with no written verdict is judged from the ledger.
+  It counts only if the Experiment was created before the ledger row of its
+  ``run_id``.
 - **Mirror.** An Experiment mirrors ledger row ``ID`` when labelled
   ``ledger:ID``.
 - **Review.** A Belief labelled ``reviewed`` passed an adversarial review.
@@ -34,6 +36,7 @@ from typing import Literal
 
 import asyncio
 import json
+import re
 
 from configgle import Fig
 from fastapi import APIRouter, Request
@@ -58,39 +61,67 @@ REVIEWED_LABEL = "reviewed"
 LEDGER_PREFIX = "ledger:"
 
 
+type Verdict = Literal["hit", "half", "miss", "null", "pending", "late", "invalid"]
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Prediction:
-    """One pre-registered prediction and, once its run is scored, its result."""
+    """One pre-registered prediction and, once judged, its result.
+
+    Attributes:
+      verdict: ``hit``/``half``/``miss``/``null`` once judged; ``pending``
+        before; ``late`` when registered after its ledger row; ``invalid``
+        when it states no prediction.
+      direction: For a miss, whether the result came in ``low`` or ``high``
+        of the interval, when that is known.
+      source: ``outcome`` when the verdict was read from the Experiment's
+        outcome text, ``ledger`` when computed from the ledger.
+      uninformative: The outcome itself calls the prediction uninformative or
+        low-information: an interval so wide it could not miss.
+
+    """
 
     experiment: int
     run_id: str
     pair: str
     metric: str
-    lo: float
-    hi: float
+    lo: float | None
+    hi: float | None
     registered: datetime
+    author: str = ""
     observed: float | None = None
     scored: datetime | None = None
-    verdict: Literal["hit", "miss_low", "miss_high", "pending", "late", "invalid"] = (
-        "pending"
-    )
+    verdict: Verdict = "pending"
+    direction: Literal["low", "high"] | None = None
+    source: Literal["outcome", "ledger", ""] = ""
+    uninformative: bool = False
     note: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Calibration:
-    """How the resolved predictions fared as a set."""
+    """How the judged predictions fared as a set."""
 
     resolved: int
+    """Judged hit, half or miss; ``null`` verdicts are counted apart."""
+
     hits: int
+    halves: int
     misses_low: int
     misses_high: int
-    sign_p: float | None
-    """Two-sided sign-test p-value that misses fall low as often as high."""
+    misses_unstated: int
+    nulls: int = 0
+    uninformative: int = 0
+    sign_p: float | None = None
+    """Two-sided sign-test p-value that stated misses fall low as often as high."""
 
-    mean_offset: float | None
-    """Mean of (observed - midpoint) / half-width; 0 is centred, below -1 is
-    a miss low on average."""
+    by_author: dict[str, tuple[int, int, int]] = field(default_factory=dict)
+    """Per author: hits, halves, misses."""
+
+    @property
+    def hit_rate(self) -> float:
+        """Hits plus half the halves, over the judged."""
+        return (self.hits + self.halves / 2) / self.resolved if self.resolved else 0.0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -236,58 +267,128 @@ def _skill_pt(row: Mapping[str, object], window: str, pair: str) -> float | None
     return float(skill) * 100 if isinstance(skill, int | float) else None
 
 
+# How agents record a judged prediction in the Experiment's outcome text:
+# ``HIT: ...``, ``MISS (high): ...``, ``HALF: ...``, ``NULL ...``, ``9/9 HIT``,
+# ``3 HIT / 4 MISS``, optionally after a ``(1)`` or ``Spreads`` lead-in.
+_VERDICT = re.compile(
+    r"^\W*(?:\(\w+\)\s*|[A-Za-z]+\s+(?=\d+/\d+))?"
+    r"(?:(?P<k>\d+)\s*/\s*(?P<n>\d+)\s+HIT"
+    r"|(?P<hits>\d+)\s+HIT\s*/\s*(?P<misses>\d+)\s+MISS"
+    r"|(?P<word>HIT|MISS|HALF|NULL)\b)",
+    re.IGNORECASE,
+)
+_HIGH = re.compile(r"\((?:[^)]*\b)?high\b|just high", re.IGNORECASE)
+_LOW = re.compile(r"\((?:[^)]*\b)?low\b|just low", re.IGNORECASE)
+_UNINFORMATIVE = re.compile(r"uninformative|low-information", re.IGNORECASE)
+
+
+def read_verdict(outcome: str | None) -> tuple[Verdict, Literal["low", "high"] | None]:
+    """Read the verdict an agent wrote at the start of an outcome.
+
+    Args:
+      outcome: The Experiment's outcome text.
+
+    Returns:
+      verdict: ``hit``, ``half``, ``miss`` or ``null``; ``pending`` when the
+        text states none.
+      direction: ``low`` or ``high`` for a miss whose opening says which.
+
+    """
+    found = _VERDICT.match(outcome or "")
+    if found is None:
+        return "pending", None
+    if found["k"] is not None:
+        verdict: Verdict = "hit" if found["k"] == found["n"] else "half"
+    elif found["hits"] is not None:
+        verdict = (
+            "hit"
+            if int(found["misses"]) == 0
+            else "miss"
+            if int(found["hits"]) == 0
+            else "half"
+        )
+    else:
+        verdict = found["word"].lower()  # pyright: ignore[reportAssignmentType]
+    if verdict != "miss":
+        return verdict, None
+    head = (outcome or "")[:80]
+    return verdict, "high" if _HIGH.search(head) else "low" if _LOW.search(
+        head
+    ) else None
+
+
+def _number(value: object) -> float | None:
+    """Return a numeric bound, or None for an open or unreadable one."""
+    return (
+        float(value)
+        if isinstance(value, int | float) and not isinstance(value, bool)
+        else None
+    )
+
+
 def _resolve(
     experiment: Experiment, ledger: Sequence[Mapping[str, object]]
 ) -> Prediction:
-    """Read one pre-registration and judge it against the ledger."""
+    """Read one pre-registration and judge it.
+
+    An agent's own verdict in the outcome text wins: metrics differ across
+    loops (skill points, EUR/MWh PnL, R2, Sharpe ratios), and only the agent
+    that ran the test knows which number answers its prediction. Without
+    one, a ``skill_pt``/``delta_pt`` prediction on a forecast ledger is
+    judged from the ledger itself.
+    """
     config = experiment.config or {}
     spec = config.get("prediction")
-    if not isinstance(spec, Mapping):
+    if not isinstance(spec, Mapping) or not spec:
         return _invalid(experiment, "config.prediction is missing")
-    try:
-        run_id = str(spec["run_id"])
-        pair = str(spec["pair"])
-        metric = str(spec.get("metric", "skill_pt"))
-        lo, hi = float(spec["lo"]), float(spec["hi"])  # pyright: ignore[reportArgumentType]
-    except (KeyError, TypeError, ValueError):
-        return _invalid(experiment, "prediction needs run_id, pair, lo and hi")
-    if lo > hi or metric not in ("skill_pt", "delta_pt"):
-        return _invalid(experiment, "lo > hi, or metric is not skill_pt/delta_pt")
-    window = str(spec.get("window", "dev"))
+    lo, hi = _number(spec.get("lo")), _number(spec.get("hi"))
+    run_id = str(spec.get("run_id") or "")
     base = Prediction(
         experiment=experiment.seq,
         run_id=run_id,
-        pair=pair,
-        metric=metric,
+        pair=str(spec.get("pair") or ""),
+        metric=str(spec.get("metric") or ("multi" if "lo" not in spec else "skill_pt")),
         lo=lo,
         hi=hi,
         registered=experiment.created,
+        author=str(spec.get("author") or spec.get("agent") or ""),
+        uninformative=bool(_UNINFORMATIVE.search(experiment.outcome or "")),
     )
-    row = _latest(ledger, run_id)
-    if row is None:
-        return base
-    observed = _skill_pt(row, window, pair)
-    if observed is not None and metric == "delta_pt":
-        parent = _latest(ledger, str(spec.get("parent", "")))
-        parent_skill = None if parent is None else _skill_pt(parent, window, pair)
-        observed = None if parent_skill is None else observed - parent_skill
-    scored = _when(row)
-    if observed is None:
-        return _replace(
-            base, scored=scored, verdict="invalid", note="no score for that pair"
-        )
+    row = _latest(ledger, run_id) if run_id else None
+    scored = None if row is None else _when(row)
     if scored is not None and experiment.created >= scored:
         return _replace(
-            base,
-            observed=observed,
-            scored=scored,
-            verdict="late",
-            note="registered after the result",
+            base, scored=scored, verdict="late", note="registered after the result"
         )
-    verdict: Literal["hit", "miss_low", "miss_high"] = (
-        "miss_low" if observed < lo else "miss_high" if observed > hi else "hit"
+    verdict, direction = read_verdict(experiment.outcome)
+    if verdict != "pending":
+        return _replace(
+            base, scored=scored, verdict=verdict, direction=direction, source="outcome"
+        )
+    if (
+        row is None
+        or base.metric not in ("skill_pt", "delta_pt")
+        or lo is None
+        or hi is None
+    ):
+        return base
+    window = str(spec.get("window") or "dev").split()[0]
+    observed = _skill_pt(row, window, base.pair)
+    if observed is not None and base.metric == "delta_pt":
+        parent = _latest(ledger, str(spec.get("parent") or ""))
+        parent_skill = None if parent is None else _skill_pt(parent, window, base.pair)
+        observed = None if parent_skill is None else observed - parent_skill
+    if observed is None:
+        return _replace(base, scored=scored, note="no ledger score for that pair")
+    miss = observed < lo or observed > hi
+    return _replace(
+        base,
+        observed=observed,
+        scored=scored,
+        verdict="miss" if miss else "hit",
+        direction=None if not miss else "low" if observed < lo else "high",
+        source="ledger",
     )
-    return _replace(base, observed=observed, scored=scored, verdict=verdict)
 
 
 def _replace(base: Prediction, **changes: object) -> Prediction:
@@ -304,8 +405,8 @@ def _invalid(experiment: Experiment, note: str) -> Prediction:
         run_id="",
         pair="",
         metric="",
-        lo=0.0,
-        hi=0.0,
+        lo=None,
+        hi=None,
         registered=experiment.created,
         verdict="invalid",
         note=note,
@@ -323,24 +424,32 @@ def _latest(
 
 
 def _calibration(predictions: Sequence[Prediction]) -> Calibration | None:
-    """Summarize the resolved predictions."""
-    resolved = [p for p in predictions if p.verdict in ("hit", "miss_low", "miss_high")]
-    if not resolved:
+    """Summarize the judged predictions."""
+    judged = [p for p in predictions if p.verdict in ("hit", "half", "miss")]
+    if not judged:
         return None
-    low = sum(1 for p in resolved if p.verdict == "miss_low")
-    high = sum(1 for p in resolved if p.verdict == "miss_high")
-    offsets = [
-        (p.observed - (p.lo + p.hi) / 2) / ((p.hi - p.lo) / 2)
-        for p in resolved
-        if p.observed is not None and p.hi > p.lo
-    ]
+    misses = [p for p in judged if p.verdict == "miss"]
+    low = sum(1 for p in misses if p.direction == "low")
+    high = sum(1 for p in misses if p.direction == "high")
+    by_author: dict[str, tuple[int, int, int]] = {}
+    for p in judged:
+        hits, halves, missed = by_author.get(p.author or "?", (0, 0, 0))
+        by_author[p.author or "?"] = (
+            hits + (p.verdict == "hit"),
+            halves + (p.verdict == "half"),
+            missed + (p.verdict == "miss"),
+        )
     return Calibration(
-        resolved=len(resolved),
-        hits=len(resolved) - low - high,
+        resolved=len(judged),
+        hits=sum(1 for p in judged if p.verdict == "hit"),
+        halves=sum(1 for p in judged if p.verdict == "half"),
         misses_low=low,
         misses_high=high,
+        misses_unstated=len(misses) - low - high,
+        nulls=sum(1 for p in predictions if p.verdict == "null"),
+        uninformative=sum(1 for p in judged if p.uninformative),
         sign_p=_sign_test(low, high),
-        mean_offset=sum(offsets) / len(offsets) if offsets else None,
+        by_author=by_author,
     )
 
 
@@ -418,21 +527,30 @@ def render(found: Audit) -> str:
     lines.append(f"  {found.unparented} name no parent run")
     lines.append(f"predictions: {len(found.predictions)} pre-registered")
     for p in found.predictions:
-        observed = "" if p.observed is None else f" observed {p.observed:+.2f}"
+        if p.verdict in ("hit", "half", "miss", "null"):
+            continue
         lines.append(
-            f"  Experiment#{p.experiment} {p.run_id} {p.pair} {p.metric} "
-            f"[{p.lo:+.2f}, {p.hi:+.2f}]{observed}: {p.verdict}"
+            f"  Experiment#{p.experiment} {p.run_id or '-'}: {p.verdict}"
             + (f" ({p.note})" if p.note else ""),
         )
     if (cal := found.calibration) is not None:
-        offset = (
-            "" if cal.mean_offset is None else f", mean offset {cal.mean_offset:+.2f}"
-        )
         p_value = "" if cal.sign_p is None else f", sign test p={cal.sign_p:.3f}"
         lines.append(
-            f"calibration: {cal.hits}/{cal.resolved} hit, {cal.misses_low} low, "
-            f"{cal.misses_high} high{p_value}{offset}",
+            f"calibration: {cal.resolved} judged, hit rate {cal.hit_rate:.0%} "
+            f"({cal.hits} hit, {cal.halves} half, "
+            f"{cal.misses_low + cal.misses_high + cal.misses_unstated} miss), "
+            f"{cal.nulls} null",
         )
+        lines.append(
+            f"  misses: {cal.misses_low} low, {cal.misses_high} high, "
+            f"{cal.misses_unstated} direction unstated{p_value}",
+        )
+        if cal.uninformative:
+            lines.append(
+                f"  {cal.uninformative} judged uninformative by their own outcome"
+            )
+        for author, (hits, halves, missed) in sorted(cal.by_author.items()):
+            lines.append(f"  {author}: {hits} hit, {halves} half, {missed} miss")
     lines.append(f"beliefs: {len(found.beliefs)} flags")
     grouped: dict[str, list[BeliefFlag]] = {}
     for flag in found.beliefs:
@@ -452,8 +570,11 @@ class Research:
     """Report the research loop's calibration, ledger drift and Belief health."""
 
     class Config(Fig["Research"]):
-        ledger_path: str = "~/Desktop/Windrunner/wr-data/forecast/ledger.jsonl"
-        """The ledger the loop's scorer writes."""
+        ledger_paths: tuple[str, ...] = (
+            "~/Desktop/Windrunner/wr-data/forecast/ledger.jsonl",
+            "~/Desktop/Windrunner/wr-data/forecast/market_ledger.jsonl",
+        )
+        """The ledgers the loop's scorers write, read as one."""
 
         stale_after_days: float = 2.0
         """How long Beliefs may go unwritten while results arrive."""
@@ -482,7 +603,11 @@ class Research:
                 if isinstance(item, Belief)
             ]
             found = audit(
-                await asyncio.to_thread(read_ledger, config.ledger_path),
+                [
+                    row
+                    for path in config.ledger_paths
+                    for row in await asyncio.to_thread(read_ledger, path)
+                ],
                 experiments,
                 beliefs,
                 now=datetime.now(UTC),
