@@ -265,7 +265,7 @@ def audit(
                 ),
             ),
         )
-    oracles = _oracles(experiments, ledger)
+    oracles = _oracles(experiments, ledger, pairs=pairs)
     return Audit(
         oracles=oracles,
         unmeasured=_unmeasured(oracles, pairs=pairs, components=components),
@@ -284,14 +284,19 @@ ORACLE_LABEL = "oracle"
 
 
 def _oracles(
-    experiments: Sequence[Experiment], ledger: Sequence[Mapping[str, object]]
+    experiments: Sequence[Experiment],
+    ledger: Sequence[Mapping[str, object]],
+    *,
+    pairs: Sequence[str] = (),
 ) -> list[Oracle]:
     """Collect the oracles: Experiments labelled ``oracle`` and ``ORACLE_`` rows.
 
     An oracle Experiment states ``config.oracle``: ``{"pair", "component",
     "headroom_pt", "ci"}``, or a list of such for several pairs. A ledger row
     whose run is ``ORACLE_*`` is listed under component ``unlabelled`` with
-    its skill in place of a headroom, until an Experiment says what it measured.
+    its skill in place of a headroom, until an Experiment says what it measured;
+    only for the budgeted ``pairs``, since other ledgers score oracles against
+    references that are not headroom.
     """
     found: list[Oracle] = []
     labelled: set[str] = set()
@@ -328,7 +333,7 @@ def _oracles(
             continue
         metrics = row.get("metrics")
         dev = metrics.get("dev") if isinstance(metrics, Mapping) else None
-        pairs = dev.get("pairs") if isinstance(dev, Mapping) else None
+        scored = dev.get("pairs") if isinstance(dev, Mapping) else None
         found.extend(
             Oracle(
                 pair=str(pair),
@@ -337,8 +342,9 @@ def _oracles(
                 ci=None,
                 source=run_id,
             )
-            for pair in pairs or {}
-            if (skill := _skill_pt(row, "dev", str(pair))) is not None
+            for pair in scored or {}
+            if str(pair) in pairs
+            and (skill := _skill_pt(row, "dev", str(pair))) is not None
         )
     return found
 
