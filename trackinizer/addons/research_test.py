@@ -249,3 +249,44 @@ def test_a_comma_joined_label_counts_as_prereg() -> None:
     )
     found = audit([], [experiment], [], now=_T0)
     assert [p.verdict for p in found.predictions] == ["hit"]
+
+
+def test_error_budget_lists_oracles_and_unmeasured_components() -> None:
+    oracle = Experiment(
+        seq=7,
+        title="O1 weather oracle",
+        labels=("oracle",),
+        config={
+            "oracle": [
+                {
+                    "pair": "DK1/wind_mw",
+                    "component": "weather",
+                    "headroom_pt": 14.0,
+                    "ci": [12.0, 16.0],
+                    "run_id": "ORACLE_O1",
+                },
+            ],
+        },
+        created=_T0,
+    )
+    ledger = [
+        _row("o1", "ORACLE_O1", 1, {"DK1/wind_mw": 12.5}),
+        _row("o2", "ORACLE_O2_solar_price", 1, {"DK1/solar_mw": 1.5}),
+    ]
+    found = audit(
+        ledger,
+        [oracle],
+        [],
+        now=_T0,
+        pairs=("DK1/wind_mw", "DK1/solar_mw"),
+        components=("weather", "curtailment"),
+    )
+    assert [(o.pair, o.component, o.headroom_pt) for o in found.oracles] == [
+        ("DK1/wind_mw", "weather", 14.0),
+        ("DK1/solar_mw", "unlabelled", 1.5),
+    ]
+    assert found.unmeasured == {
+        "DK1/wind_mw": ["curtailment"],
+        "DK1/solar_mw": ["weather", "curtailment"],
+    }
+    assert "DK1/solar_mw unmeasured: weather, curtailment" in render(found)

@@ -21,6 +21,10 @@ Conventions it reads, all on existing kinds:
 - **Mirror.** An Experiment mirrors ledger row ``ID`` when labelled
   ``ledger:ID``.
 - **Review.** A Belief labelled ``reviewed`` passed an adversarial review.
+- **Oracle.** An Experiment labelled ``oracle`` whose ``config.oracle`` is
+  ``{"pair", "component", "headroom_pt", "ci", "run_id"}`` (or a list): the
+  skill gain when one error source is made perfect. The audit lists them per
+  pair and names the budget components still unmeasured.
 
 The ledger is the source of truth and the only file read; nothing here writes.
 """
@@ -135,6 +139,26 @@ class BeliefFlag:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class Oracle:
+    """One measured oracle: how much of a pair's error one component accounts for.
+
+    Attributes:
+      pair: ``ZONE/target``, e.g. ``DK1/solar_mw``.
+      component: Which error source the oracle removed, e.g. ``weather``.
+      headroom_pt: The skill gain with that source made perfect, in points.
+      ci: Its interval, when given.
+      source: ``Experiment#N`` or the ledger run id it came from.
+
+    """
+
+    pair: str
+    component: str
+    headroom_pt: float | None
+    ci: tuple[float, float] | None
+    source: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Audit:
     """Everything the audit found."""
 
@@ -150,6 +174,11 @@ class Audit:
     beliefs: list[BeliefFlag] = field(default_factory=list)
     last_belief: datetime | None = None
     results_since_last_belief: int = 0
+    oracles: list[Oracle] = field(default_factory=list)
+    """Measured error-budget components."""
+
+    unmeasured: dict[str, list[str]] = field(default_factory=dict)
+    """Per pair, the error-budget components no oracle has measured yet."""
 
 
 def read_ledger(path: Path | str) -> list[dict[str, object]]:
@@ -183,6 +212,8 @@ def audit(
     *,
     now: datetime,
     stale_after: timedelta = timedelta(days=2),
+    pairs: Sequence[str] = (),
+    components: Sequence[str] = (),
 ) -> Audit:
     """Audit predictions, the ledger mirror and the Beliefs.
 
@@ -193,6 +224,8 @@ def audit(
       now: The current time.
       stale_after: How long Beliefs may go unwritten while results arrive
         before that is flagged.
+      pairs: The ``ZONE/target`` pairs an error budget is kept for.
+      components: The error sources each pair's budget splits into.
 
     Returns:
       audit: What was found.
@@ -232,7 +265,10 @@ def audit(
                 ),
             ),
         )
+    oracles = _oracles(experiments, ledger)
     return Audit(
+        oracles=oracles,
+        unmeasured=_unmeasured(oracles, pairs=pairs, components=components),
         ledger_rows=len(ledger),
         unmirrored=unmirrored,
         unparented=unparented,
@@ -242,6 +278,81 @@ def audit(
         last_belief=last_belief,
         results_since_last_belief=len(since),
     )
+
+
+ORACLE_LABEL = "oracle"
+
+
+def _oracles(
+    experiments: Sequence[Experiment], ledger: Sequence[Mapping[str, object]]
+) -> list[Oracle]:
+    """Collect the oracles: Experiments labelled ``oracle`` and ``ORACLE_`` rows.
+
+    An oracle Experiment states ``config.oracle``: ``{"pair", "component",
+    "headroom_pt", "ci"}``, or a list of such for several pairs. A ledger row
+    whose run is ``ORACLE_*`` is listed under component ``unlabelled`` with
+    its skill in place of a headroom, until an Experiment says what it measured.
+    """
+    found: list[Oracle] = []
+    labelled: set[str] = set()
+    for experiment in experiments:
+        if ORACLE_LABEL not in _labels(experiment.labels):
+            continue
+        spec = (experiment.config or {}).get("oracle")
+        specs = spec if isinstance(spec, list) else [spec]
+        for item in specs:
+            if not isinstance(item, Mapping):
+                continue
+            ci = item.get("ci")
+            bounds = (
+                (float(ci[0]), float(ci[1]))
+                if isinstance(ci, Sequence)
+                and len(ci) == 2
+                and all(_number(v) is not None for v in ci)
+                else None
+            )
+            found.append(
+                Oracle(
+                    pair=str(item.get("pair") or ""),
+                    component=str(item.get("component") or "unlabelled"),
+                    headroom_pt=_number(item.get("headroom_pt")),
+                    ci=bounds,
+                    source=f"Experiment#{experiment.seq}",
+                ),
+            )
+            if item.get("run_id"):
+                labelled.add(str(item["run_id"]))
+    for row in ledger:
+        run_id = str(row.get("run_id") or "")
+        if not run_id.startswith("ORACLE_") or run_id in labelled:
+            continue
+        metrics = row.get("metrics")
+        dev = metrics.get("dev") if isinstance(metrics, Mapping) else None
+        pairs = dev.get("pairs") if isinstance(dev, Mapping) else None
+        found.extend(
+            Oracle(
+                pair=str(pair),
+                component="unlabelled",
+                headroom_pt=skill,
+                ci=None,
+                source=run_id,
+            )
+            for pair in pairs or {}
+            if (skill := _skill_pt(row, "dev", str(pair))) is not None
+        )
+    return found
+
+
+def _unmeasured(
+    oracles: Sequence[Oracle], *, pairs: Sequence[str], components: Sequence[str]
+) -> dict[str, list[str]]:
+    """List, per pair, the components no oracle has measured."""
+    measured = {(oracle.pair, oracle.component) for oracle in oracles}
+    return {
+        pair: missing
+        for pair in pairs
+        if (missing := [c for c in components if (pair, c) not in measured])
+    }
 
 
 def _labels(labels: Sequence[str] | None) -> set[str]:
@@ -560,6 +671,15 @@ def render(found: Audit) -> str:
             )
         for author, (hits, halves, missed) in sorted(cal.by_author.items()):
             lines.append(f"  {author}: {hits} hit, {halves} half, {missed} miss")
+    lines.append(f"error budget: {len(found.oracles)} oracle measurements")
+    for oracle in sorted(found.oracles, key=lambda o: (o.pair, o.component)):
+        value = "n/a" if oracle.headroom_pt is None else f"{oracle.headroom_pt:+.1f} pt"
+        ci = "" if oracle.ci is None else f" [{oracle.ci[0]:+.1f}, {oracle.ci[1]:+.1f}]"
+        lines.append(
+            f"  {oracle.pair} {oracle.component}: {value}{ci} ({oracle.source})"
+        )
+    for pair, missing in found.unmeasured.items():
+        lines.append(f"  {pair} unmeasured: {', '.join(missing)}")
     lines.append(f"beliefs: {len(found.beliefs)} flags")
     grouped: dict[str, list[BeliefFlag]] = {}
     for flag in found.beliefs:
@@ -587,6 +707,24 @@ class Research:
 
         stale_after_days: float = 2.0
         """How long Beliefs may go unwritten while results arrive."""
+
+        budget_pairs: tuple[str, ...] = (
+            "DK1/wind_mw",
+            "DK1/solar_mw",
+            "DK2/wind_mw",
+            "DK2/solar_mw",
+        )
+        """The pairs an error budget is kept for."""
+
+        budget_components: tuple[str, ...] = (
+            "weather",
+            "power_curve",
+            "curtailment",
+            "capacity",
+            "availability",
+            "timing",
+        )
+        """The error sources each budget splits into."""
 
     def __init__(self, config: Config) -> None:
         self.config = config
@@ -621,6 +759,8 @@ class Research:
                 beliefs,
                 now=datetime.now(UTC),
                 stale_after=timedelta(days=config.stale_after_days),
+                pairs=config.budget_pairs,
+                components=config.budget_components,
             )
             if output == "json":
                 return json.loads(json.dumps(found, default=_plain))
