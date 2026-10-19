@@ -236,3 +236,16 @@ def test_read_ledger_skips_a_torn_line(tmp_path: Path) -> None:
     path = tmp_path / "ledger.jsonl"
     path.write_text('{"id": "a"}\n{"id": "b"}\n{"id": ')
     assert [row["id"] for row in read_ledger(path)] == ["a", "b"]
+
+
+def test_a_comma_joined_label_counts_as_prereg() -> None:
+    experiment = Experiment(
+        seq=1,
+        title="PRED",
+        labels=("prereg,theory,qb8",),
+        config={"prediction": {"run_id": "Q", "metric": "r2", "lo": 0.1, "hi": None}},
+        outcome="HIT: R2 0.2",
+        created=_T0,
+    )
+    found = audit([], [experiment], [], now=_T0)
+    assert [p.verdict for p in found.predictions] == ["hit"]

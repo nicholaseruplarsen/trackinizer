@@ -211,7 +211,7 @@ def audit(
     predictions = [
         _resolve(experiment, ledger)
         for experiment in experiments
-        if PREREG_LABEL in (experiment.labels or ())
+        if PREREG_LABEL in _labels(experiment.labels)
     ]
     last_belief = max((belief.created for belief in beliefs), default=None)
     since = [
@@ -242,6 +242,15 @@ def audit(
         last_belief=last_belief,
         results_since_last_belief=len(since),
     )
+
+
+def _labels(labels: Sequence[str] | None) -> set[str]:
+    """Return an inquiry's labels, splitting any written as one comma list.
+
+    ``label add prereg,theory,qb8`` stores one label with commas in it; the
+    author meant three.
+    """
+    return {part.strip() for label in labels or () for part in label.split(",")}
 
 
 def _when(row: Mapping[str, object]) -> datetime | None:
@@ -473,7 +482,7 @@ def _belief_flags(
         if belief.status != "active":
             continue
         confidence = belief.confidence
-        labels = belief.labels or ()
+        labels = _labels(belief.labels)
         evidence = [edge for edge in belief.proved_by if edge.valence > 0]
         if (
             confidence is not None
