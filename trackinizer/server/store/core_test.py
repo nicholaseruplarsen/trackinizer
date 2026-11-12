@@ -265,7 +265,7 @@ class TestStoreBootstrap:
         ]
         # One reconcile per kind, each guarded by GREATEST so a healthy
         # sequence is never lowered, each carrying the table max as the floor.
-        assert len(setvals) == 9
+        assert len(setvals) == 11
         assert all(
             "GREATEST" in _sql(c.args) and "last_value" in _sql(c.args) for c in setvals
         )

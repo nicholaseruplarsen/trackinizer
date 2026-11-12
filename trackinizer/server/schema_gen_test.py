@@ -77,6 +77,8 @@ class TestPureFunctions:
             "WebResult",
             "WebSearch",
             "AgentSession",
+            "Theory",
+            "Prediction",
         }
         assert set(SEQ_FOR_KIND.keys()) == kinds
 

@@ -37,6 +37,7 @@ from trackinizer.types.inquiries import (
     Inquiry,
     Issue,
     Paper,
+    Prediction,
 )
 from trackinizer.wire.filters import Filter
 from trackinizer.wire.refs import Ref, SeqRef, UuidRef
@@ -418,6 +419,22 @@ EDGE_ALIASES: Mapping[str, Edge] = {
     # lists B; ``A cited_by B`` = B cites A (same stored edge, reversed).
     "cites": Edge(name="cites_paper"),
     "cited_by": Edge(name="cites_paper", reverse=True),
+    # The theory edges (docs/epistemy.md). predicts: Prediction -> Theory.
+    # tests: Experiment -> Prediction. rivals: Theory -> Theory, lower seq
+    # first. fits: Experiment -> Theory. assumes: dependent Belief -> the
+    # Belief it assumes. about: Belief -> Theory.
+    "predicts": Edge(name="predicts"),
+    "predicted_by": Edge(name="predicts", reverse=True),
+    "tests": Edge(name="tests"),
+    "tested_by": Edge(name="tests", reverse=True),
+    "rivals": Edge(name="rivals"),
+    "rivalled_by": Edge(name="rivals", reverse=True),
+    "fits": Edge(name="fits"),
+    "fitted_by": Edge(name="fits", reverse=True),
+    "assumes": Edge(name="assumes"),
+    "assumed_by": Edge(name="assumes", reverse=True),
+    "about": Edge(name="about"),
+    "discussed_by": Edge(name="about", reverse=True),
 }
 ISSUE_KINDS: tuple[Issue.Kind, ...] = cast(
     tuple[Issue.Kind, ...],
@@ -465,6 +482,18 @@ RELATION_ALIASES: Final[Mapping[str, tuple[str, bool]]] = {
     "superseded_by": ("supersedes", True),
     "cites": ("cites_paper", False),
     "cited_by": ("cites_paper", True),
+    "predicts": ("predicts", False),
+    "predicted_by": ("predicts", True),
+    "tests": ("tests", False),
+    "tested_by": ("tests", True),
+    "rivals": ("rivals", False),
+    "rivalled_by": ("rivals", True),
+    "fits": ("fits", False),
+    "fitted_by": ("fits", True),
+    "assumes": ("assumes", False),
+    "assumed_by": ("assumes", True),
+    "about": ("about", False),
+    "discussed_by": ("about", True),
 }
 
 # Relation spellings that select the AGAINST (negative-valence) subset of their
@@ -607,6 +636,38 @@ def _reject_nonstandard_json_constant(value: str) -> object:
     raise ValueError(f"non-standard numeric constant {value!r}")
 
 
+def _coerce_json_any(value: str) -> object:
+    """Parse a token as JSON when it is JSON, else keep it as a plain string.
+
+    ``regime`` is free text or a JSON predicate, so ``"DK1 wind, dev window"``
+    and ``{"zones": ["DK1"]}`` are both valid.
+    """
+    if value == "-" or value.startswith("@"):
+        return value
+    try:
+        return cast(
+            object,
+            json.loads(value, parse_constant=_reject_nonstandard_json_constant),
+        )
+    except ValueError:
+        return value
+
+
+def _coerce_made_by(value: str) -> str:
+    if value not in get_args(cast(object, Prediction.Source.__value__)):
+        raise ValueError(f"made_by is theory|agent|house-prior, not {value!r}")
+    return value
+
+
+def _coerce_bool(value: str) -> bool:
+    lowered = value.strip().lower()
+    if lowered in ("true", "yes", "1"):
+        return True
+    if lowered in ("false", "no", "0"):
+        return False
+    raise ValueError(f"expected true or false, got {value!r}")
+
+
 _COERCE: Mapping[str, Callable[[str], object]] = {
     "priority": _coerce_priority,
     "confidence": _coerce_confidence,
@@ -614,6 +675,13 @@ _COERCE: Mapping[str, Callable[[str], object]] = {
     "judgement": _coerce_judgement,
     "publication_type": _coerce_publication_type,
     "config": _coerce_config,
+    "variables": _coerce_config,
+    "parameters": _coerce_config,
+    "quantity": _coerce_config,
+    "quantiles": _coerce_config,
+    "regime": _coerce_json_any,
+    "made_by": _coerce_made_by,
+    "needs_review": _coerce_bool,
 }
 
 
@@ -680,6 +748,89 @@ _FIELDS: tuple[Field, ...] = (
         shape="scalar",
         help="run settings as one JSON object (inline or @file.json)",
         filterable=False,
+    ),
+    Field(
+        cli_name="explains",
+        payload_key="explains",
+        shape="scalar",
+        help="Theory: the quantity the law explains, e.g. dk1.wind.mae",
+    ),
+    Field(
+        cli_name="form",
+        payload_key="form",
+        shape="scalar",
+        help="Theory: the law, e.g. 'MAE(D) = Einf + B * D^-beta'",
+    ),
+    Field(
+        cli_name="variables",
+        payload_key="variables",
+        shape="scalar",
+        help='Theory: JSON {name: {"unit", "fitted_range": [lo, hi]}}',
+        filterable=False,
+    ),
+    Field(
+        cli_name="parameters",
+        payload_key="parameters",
+        shape="scalar",
+        help='Theory: JSON {name: {"mean", "lo90", "hi90"}}, the current fit',
+        filterable=False,
+    ),
+    Field(
+        cli_name="regime",
+        payload_key="regime",
+        shape="scalar",
+        help="Theory: where the law holds (text or JSON)",
+        filterable=False,
+    ),
+    Field(
+        cli_name="fit_ref",
+        payload_key="fit_ref",
+        shape="scalar",
+        help="Theory: the fitting code as path@sha",
+    ),
+    Field(
+        cli_name="quantity",
+        payload_key="quantity",
+        shape="scalar",
+        help='Prediction: JSON {"key", "better", "run_id"|"ticket"|"r2_key", ...}',
+        filterable=False,
+    ),
+    Field(
+        cli_name="quantiles",
+        payload_key="quantiles",
+        shape="scalar",
+        help='Prediction: JSON {"q05", "q25", "q50", "q75", "q95"}',
+        filterable=False,
+    ),
+    Field(
+        cli_name="made_by",
+        payload_key="made_by",
+        shape="scalar",
+        help="Prediction: theory|agent|house-prior",
+    ),
+    Field(
+        cli_name="override_of",
+        payload_key="override_of",
+        shape="scalar",
+        help="Prediction: the Prediction this one adjusts by hand",
+    ),
+    Field(
+        cli_name="needs_review",
+        payload_key="needs_review",
+        shape="scalar",
+        help="Belief: true while an assumption changed since the last review",
+    ),
+    Field(
+        cli_name="reviewed_at",
+        payload_key="reviewed_at",
+        shape="scalar",
+        help="Belief: when it was last reviewed (ISO time)",
+    ),
+    Field(
+        cli_name="review_note",
+        payload_key="review_note",
+        shape="scalar",
+        help="Belief: what the last review concluded",
     ),
     Field(
         cli_name="source",

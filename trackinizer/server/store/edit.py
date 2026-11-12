@@ -904,6 +904,222 @@ class _EditMixin(_CascadeAuditMixin):
             reason=reason,
         )
 
+    async def set_needs_review(
+        self,
+        target_id: UUID,
+        value: bool | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="belief_needs_review",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_reviewed_at(
+        self,
+        target_id: UUID,
+        value: datetime | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="belief_reviewed_at",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_review_note(
+        self,
+        target_id: UUID,
+        value: str | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="belief_review_note",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_explains(
+        self,
+        target_id: UUID,
+        value: str | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_explains",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_form(
+        self,
+        target_id: UUID,
+        value: str | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_form",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_variables(
+        self,
+        target_id: UUID,
+        value: dict[str, object] | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_variables",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_parameters(
+        self,
+        target_id: UUID,
+        value: dict[str, object] | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_parameters",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_regime(
+        self,
+        target_id: UUID,
+        value: object | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_regime",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_fit_ref(
+        self,
+        target_id: UUID,
+        value: str | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_fit_ref",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_earned_confidence(
+        self,
+        target_id: UUID,
+        value: float | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="belief_earned_confidence",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_record(
+        self,
+        target_id: UUID,
+        value: dict[str, object] | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="theory_record",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
+    async def set_resolution(
+        self,
+        target_id: UUID,
+        value: dict[str, object] | None,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor,
+        reason: str = "",
+    ) -> UUID | None:
+        return await self._set_field(
+            target_id,
+            value,
+            column="prediction_resolution",
+            api_key_id=api_key_id,
+            actor=actor,
+            reason=reason,
+        )
+
     async def set_issue_kind(
         self,
         target_id: UUID,

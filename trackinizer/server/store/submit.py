@@ -9,6 +9,7 @@ through each item so a mixed-kind batch commits or rolls back atomically.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
@@ -44,6 +45,8 @@ from trackinizer.wire.bodies import (
     SubmitExperiment,
     SubmitIssue,
     SubmitPaper,
+    SubmitPrediction,
+    SubmitTheory,
     SubmitWebResult,
     SubmitWebSearch,
 )
@@ -128,6 +131,20 @@ class _SubmitMixin(_EditMixin, _EdgeMixin):
                 )
             case SubmitPaper():
                 created = self.submit_paper(
+                    req,
+                    api_key_id=api_key_id,
+                    actor=actor,
+                    conn=conn,
+                )
+            case SubmitTheory():
+                created = self.submit_theory(
+                    req,
+                    api_key_id=api_key_id,
+                    actor=actor,
+                    conn=conn,
+                )
+            case SubmitPrediction():
+                created = self.submit_prediction(
                     req,
                     api_key_id=api_key_id,
                     actor=actor,
@@ -615,6 +632,95 @@ class _SubmitMixin(_EditMixin, _EdgeMixin):
             extras={
                 "belief_judgement": req.judgement,
                 "belief_confidence": req.confidence,
+            },
+            post_insert=post_insert,
+            conn=conn,
+        )
+
+    async def submit_theory(
+        self,
+        req: SubmitTheory,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor = "system",
+        conn: Conn | None = None,
+    ) -> UUID:
+        async def post_insert(conn: Conn, theory_id: UUID, cause: UUID) -> None:
+            # rivals is stored once per pair, lower seq first. The new Theory
+            # has the highest seq, so every existing rival is the from-side.
+            for rival in dict.fromkeys(req.rivals):
+                await self.insert_edge_and_audit(
+                    conn,
+                    subject_id=theory_id,
+                    subject_kind="Theory",
+                    to_id=rival,
+                    edge_kind="rivals",
+                    api_key_id=api_key_id,
+                    actor=actor,
+                    caused_by=cause,
+                    require_to_kind="Theory",
+                    cite_peer_as_from=True,
+                )
+
+        return await self._submit_generic(
+            req,
+            kind="Theory",
+            api_key_id=api_key_id,
+            actor=actor,
+            extras={
+                "theory_explains": req.explains,
+                "theory_form": req.form,
+                "theory_variables": req.variables,
+                "theory_parameters": req.parameters,
+                "theory_regime": req.regime,
+                "theory_fit_ref": req.fit_ref,
+            },
+            post_insert=post_insert,
+            conn=conn,
+        )
+
+    async def submit_prediction(
+        self,
+        req: SubmitPrediction,
+        *,
+        api_key_id: UUID | None = None,
+        actor: Inquiry.Actor = "system",
+        conn: Conn | None = None,
+        registered: datetime | None = None,
+    ) -> UUID:
+        """Insert a frozen Prediction.
+
+        ``registered`` defaults to the server's clock. Only the coord importer
+        passes it, with coord's own registration time; the HTTP body has no
+        such field, so a client cannot backdate a Prediction.
+        """
+
+        async def post_insert(conn: Conn, prediction_id: UUID, cause: UUID) -> None:
+            if req.theory is None:
+                return
+            await self.insert_edge_and_audit(
+                conn,
+                subject_id=prediction_id,
+                subject_kind="Prediction",
+                to_id=req.theory,
+                edge_kind="predicts",
+                api_key_id=api_key_id,
+                actor=actor,
+                caused_by=cause,
+                require_to_kind="Theory",
+            )
+
+        return await self._submit_generic(
+            req,
+            kind="Prediction",
+            api_key_id=api_key_id,
+            actor=actor,
+            extras={
+                "prediction_quantity": req.quantity,
+                "prediction_quantiles": req.quantiles,
+                "prediction_made_by": req.made_by,
+                "prediction_override_of": req.override_of,
+                "prediction_registered": registered or datetime.now(UTC),
             },
             post_insert=post_insert,
             conn=conn,

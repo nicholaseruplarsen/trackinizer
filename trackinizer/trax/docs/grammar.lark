@@ -156,13 +156,13 @@ group_create: KIND (inline_field | cost_action | safe_meta | EDGE edge_meta)+ (e
 // ---- terminals (keyword sets; spellings overlap across classes, e.g.
 // codechange is KIND+REF_LIST_FIELD, resolved by position) ----
 VERB: "search-sessions" | "confidence" | "authority" | "workspace" | "blocked" | "machine" | "profile" | "version" | "export" | "recent" | "board" | "graph" | "cost" | "help" | "next" | "send" | "wait" | "env" | "run" | "id"
-KIND: "agentsession" | "codechange" | "experiment" | "webresult" | "websearch" | "artifact" | "belief" | "issue" | "paper"
-EDGE_KEYWORD: "disfavored_by" | "superseded_by" | "broadened_by" | "disproved_by" | "narrowed_by" | "produced_by" | "required_by" | "blocked_by" | "favored_by" | "supersedes" | "disfavors" | "disproves" | "proved_by" | "broadens" | "cited_by" | "produced" | "produces" | "requires" | "narrows" | "blocks" | "favors" | "proves" | "cites"
-FIELD: "google_scholar_cluster_id" | "google_scholar_cites_id" | "publication_type" | "cli_session_id" | "publish_date" | "description" | "confidence" | "validation" | "judgement" | "abstract" | "priority" | "provider" | "subvenue" | "account" | "outcome" | "started" | "config" | "source" | "status" | "owner" | "query" | "title" | "venue" | "cli" | "sha" | "url"
+KIND: "agentsession" | "codechange" | "experiment" | "prediction" | "webresult" | "websearch" | "artifact" | "belief" | "theory" | "issue" | "paper"
+EDGE_KEYWORD: "disfavored_by" | "superseded_by" | "broadened_by" | "discussed_by" | "disproved_by" | "predicted_by" | "narrowed_by" | "produced_by" | "required_by" | "rivalled_by" | "assumed_by" | "blocked_by" | "favored_by" | "supersedes" | "disfavors" | "disproves" | "fitted_by" | "proved_by" | "tested_by" | "broadens" | "cited_by" | "predicts" | "produced" | "produces" | "requires" | "assumes" | "narrows" | "blocks" | "favors" | "proves" | "rivals" | "about" | "cites" | "tests" | "fits"
+FIELD: "google_scholar_cluster_id" | "google_scholar_cites_id" | "publication_type" | "cli_session_id" | "needs_review" | "publish_date" | "description" | "override_of" | "review_note" | "reviewed_at" | "confidence" | "parameters" | "validation" | "judgement" | "quantiles" | "variables" | "abstract" | "explains" | "priority" | "provider" | "quantity" | "subvenue" | "account" | "fit_ref" | "made_by" | "outcome" | "started" | "config" | "regime" | "source" | "status" | "owner" | "query" | "title" | "venue" | "form" | "cli" | "sha" | "url"
 LIST_FIELD: "subscribers" | "issue_kind" | "subscriber" | "issuekind" | "authors" | "author" | "labels" | "label" | "kind"
 REF_LIST_FIELD: "codechanges" | "codechange"
 COST_FIELD: "resource-cost" | "agent-cost"
-FILTER_FIELD: "google_scholar_cluster_id" | "uncategorized_tool_result" | "google_scholar_cites_id" | "agent_to_agent_message" | "shell_command_result" | "agent_status_result" | "context_compaction" | "web_search_results" | "assistant_message" | "file_write_result" | "incomplete_record" | "file_edit_result" | "file_read_result" | "publication_type" | "web_fetch_result" | "cli_session_id" | "system_message" | "context_state" | "resource-cost" | "publish_date" | "user_message" | "codechanges" | "description" | "subscribers" | "agent-cost" | "codechange" | "confidence" | "issue_kind" | "subscriber" | "validation" | "issuekind" | "judgement" | "tool_call" | "abstract" | "modified" | "priority" | "provider" | "subvenue" | "thinking" | "account" | "authors" | "created" | "outcome" | "started" | "author" | "labels" | "source" | "status" | "stderr" | "stdout" | "label" | "owner" | "query" | "stdin" | "title" | "venue" | "kind" | "cli" | "seq" | "sha" | "url" | "id"
+FILTER_FIELD: "google_scholar_cluster_id" | "uncategorized_tool_result" | "google_scholar_cites_id" | "agent_to_agent_message" | "shell_command_result" | "agent_status_result" | "context_compaction" | "web_search_results" | "assistant_message" | "file_write_result" | "incomplete_record" | "file_edit_result" | "file_read_result" | "publication_type" | "web_fetch_result" | "cli_session_id" | "system_message" | "context_state" | "resource-cost" | "needs_review" | "publish_date" | "user_message" | "codechanges" | "description" | "override_of" | "review_note" | "reviewed_at" | "subscribers" | "agent-cost" | "codechange" | "confidence" | "issue_kind" | "subscriber" | "validation" | "issuekind" | "judgement" | "tool_call" | "abstract" | "explains" | "modified" | "priority" | "provider" | "subvenue" | "thinking" | "account" | "authors" | "created" | "fit_ref" | "made_by" | "outcome" | "started" | "author" | "labels" | "source" | "status" | "stderr" | "stdout" | "label" | "owner" | "query" | "stdin" | "title" | "venue" | "form" | "kind" | "cli" | "seq" | "sha" | "url" | "id"
 FILTER_OP: "nre" | "ge" | "gt" | "is" | "le" | "lt" | "ne" | "re"
 VALUELESS_OP: "notnull" | "isnull"
 TO: "to"
@@ -204,7 +204,9 @@ VERB_ARG: /\S+/
 //   Issue: + issue_kind, issuekind, kind, priority, validation
 //   Experiment: + codechange, codechanges, config, outcome
 //   Paper: + abstract, author, authors, google_scholar_cites_id, google_scholar_cluster_id, publication_type, publish_date, source, subvenue, venue
-//   Belief: + confidence, judgement
+//   Belief: + confidence, judgement, needs_review, review_note, reviewed_at
+//   Theory: + explains, fit_ref, form, parameters, regime, variables
+//   Prediction: + made_by, override_of, quantiles, quantity
 //   CodeChange: + sha
 //   WebResult: + url
 //   WebSearch: + provider, query
@@ -219,6 +221,12 @@ VERB_ARG: /\S+/
 //   favors: disfavors favors   (reverse voice: disfavored_by favored_by)
 //   supersedes: supersedes   (reverse voice: superseded_by)
 //   cites_paper: cites   (reverse voice: cited_by)
+//   predicts: predicts   (reverse voice: predicted_by)
+//   tests: tests   (reverse voice: tested_by)
+//   rivals: rivals   (reverse voice: rivalled_by)
+//   fits: fits   (reverse voice: fitted_by)
+//   assumes: assumes   (reverse voice: assumed_by)
+//   about: about   (reverse voice: discussed_by)
 // VERBS (full usage, generated from each verb's argparse). What they do:
 //   next=next unblocked Issue; blocked/board/graph=Issue views;
 //   recent=audit feed; cost=cost rollup; id=show row by uuid;
@@ -227,11 +235,11 @@ VERB_ARG: /\S+/
 //   machine=the registry of machines campaigns may run on;
 //   run=wrap an agent CLI (claude/gemini/codex) and sync its session;
 //     --detach hosts it past this terminal, reached by run ls/attach/log/send/stop.
-//   authority issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession SEQ [--format text|json]
+//   authority issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession|theory|prediction SEQ [--format text|json]
 //   blocked
 //   board [--width V]
-//   confidence issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession SEQ [--format text|json]
-//   cost issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession SEQ [--deep] [--format text|json]
+//   confidence issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession|theory|prediction SEQ [--format text|json]
+//   cost issue|artifact|experiment|paper|belief|codechange|webresult|websearch|agentsession|theory|prediction SEQ [--deep] [--format text|json]
 //   env [ [secret] NAME to V | NAME del ]
 //   export
 //   graph [--open-only]

@@ -197,8 +197,9 @@ class TestEveryShapeMatchesTheDeclaredType:
             )
             return
         # DOUBLE PRECISION: the range is unbounded, so the bound must come
-        # from a CHECK. ``belief_confidence`` is the only such column.
-        assert column == "belief_confidence", (
+        # from a CHECK. The two Belief confidences are the only such columns,
+        # both checked to ``[0, 1]``.
+        assert column in ("belief_confidence", "belief_earned_confidence"), (
             f"{column} is {declared}, whose range is unbounded; give it a "
             "CHECK below 1e15 or teach _REAL_TEXT the wide-magnitude case"
         )

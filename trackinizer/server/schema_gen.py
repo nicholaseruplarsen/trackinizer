@@ -75,6 +75,8 @@ SEQ_FOR_KIND: dict[Inquiry.InquiryKind, str] = {
         "WebResult",
         "WebSearch",
         "AgentSession",
+        "Theory",
+        "Prediction",
     )
 }
 
@@ -116,6 +118,18 @@ CHANGE_LOG_COLUMN_ORDER: Final[tuple[str, ...]] = (
     "agentsession_started",
     "agentsession_ended",
     "agentsession_rooms",
+    "belief_earned_confidence",
+    "belief_needs_review",
+    "belief_reviewed_at",
+    "belief_review_note",
+    "theory_explains",
+    "theory_form",
+    "theory_variables",
+    "theory_parameters",
+    "theory_regime",
+    "theory_fit_ref",
+    "theory_record",
+    "prediction_resolution",
 )
 
 _EDGE_METADATA_COLUMN_ORDER: Final[tuple[str, ...]] = (
@@ -135,6 +149,8 @@ INQUIRY_KIND_ORDER: Final[tuple[Inquiry.InquiryKind, ...]] = (
     "WebResult",
     "WebSearch",
     "AgentSession",
+    "Theory",
+    "Prediction",
 )
 """Canonical order for emitting per-kind column blocks. Covers every
 ``Inquiry.InquiryKind`` value -- a future column with

@@ -179,6 +179,8 @@ class Inquiry:
         "WebResult",
         "WebSearch",
         "AgentSession",
+        "Theory",
+        "Prediction",
     ]
     """The row discriminator covering every instantiable Inquiry class.
 
@@ -720,6 +722,8 @@ class Artifact(Inquiry):
         "WebResult",
         "WebSearch",
         "AgentSession",
+        "Theory",
+        "Prediction",
     ]
     """:data:`Inquiry.InquiryKind` narrowed to the artifact branch."""
 
@@ -1037,6 +1041,52 @@ class Belief(Artifact):
     within and across buckets. ``0.5`` is the neutral prior.
     """
 
+    earned_confidence: float | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Belief"}),
+            sql_type="DOUBLE PRECISION",
+            sql_check="earned_confidence >= 0 AND earned_confidence <= 1",
+            route_editable=False,
+        ),
+    )
+    """The confidence the record earns, next to the stated :attr:`confidence`.
+
+    Set only for a Belief with an ``about`` edge to a :class:`Theory`: the
+    Theory's posterior weight against its rivals, from log scores on the
+    quantities they both predicted. Empty for qualitative Beliefs, and empty
+    (not 0) while the rivals share no scored quantity. Written by the scorer
+    (``addons/knowledge.py``), never by hand."""
+
+    needs_review: bool | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Belief"}),
+            sql_type="BOOLEAN",
+        ),
+    )
+    """A Belief this one ``assumes`` changed after this one was last updated
+    or reviewed. Set by propagation through ``assumes`` edges; cleared by
+    whoever looks, with :attr:`review_note`."""
+
+    reviewed_at: datetime | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Belief"}),
+            sql_type="TIMESTAMPTZ",
+        ),
+    )
+    """When someone last reviewed this Belief against what it assumes."""
+
+    review_note: str | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Belief"}),
+            sql_type="TEXT",
+        ),
+    )
+    """What the last review concluded."""
+
     proved_by: tuple[ArtifactEdge, ...] = ()
     """Load-bearing citations: Artifacts that cite this belief as proof and
     vote in the proof predicate; the inbound view of ``proves`` edges (stored
@@ -1051,6 +1101,181 @@ class Belief(Artifact):
     :class:`ArtifactEdge` carries the signed :attr:`Edge.valence` (positive
     favors, negative disfavors; weights the context). The active forward
     counterpart is :attr:`Artifact.favors`."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Theory(Artifact):
+    """A named, parametric, falsifiable law: how a quantity depends on variables.
+
+    A Theory states a :attr:`form` (``MAE(D) = Einf + B * D^-beta``), the
+    :attr:`variables` it was fitted over, the :attr:`parameters` with their 90%
+    intervals, and the :attr:`regime` where it claims to hold. It is judged by
+    its :class:`Prediction` rows (``predicts`` edges point at it), against the
+    Theories it ``rivals``. Experiments that refit it point at it with ``fits``;
+    Beliefs about it point at it with ``about``. :attr:`record` is the scorer's
+    summary of how its predictions fared; see ``docs/epistemy.md``.
+    """
+
+    explains: str | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="TEXT",
+        ),
+    )
+    """The quantity the law explains, e.g. ``dk1.wind.mae``."""
+
+    form: str | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="TEXT",
+        ),
+    )
+    """The law as an expression, or a pointer to the code that computes it."""
+
+    variables: dict[str, object] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="JSONB",
+        ),
+    )
+    """``{name: {"unit", "fitted_range": [lo, hi]}}``: what the law varies
+    over, and the range it was fitted on. A prediction outside that range is
+    an extrapolation, the strongest test a law gets."""
+
+    parameters: dict[str, object] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="JSONB",
+        ),
+    )
+    """``{name: {"mean", "lo90", "hi90", "n"?}}``: the current fit."""
+
+    regime: object | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="JSONB",
+        ),
+    )
+    """Where the law claims to hold: free text, or a JSON predicate over
+    zones, targets, periods and market conditions, with any breaks found."""
+
+    fit_ref: str | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="TEXT",
+        ),
+    )
+    """The code that fits it, as ``path@sha``."""
+
+    record: dict[str, object] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Theory"}),
+            sql_type="JSONB",
+            route_editable=False,
+        ),
+    )
+    """The scorer's summary: ``{"n_predictions", "logscore", "earned",
+    "shared_with_rivals", "scorer", "as_of", ...}``. ``earned`` is the
+    posterior weight against the rivals and stays null until they share a
+    scored quantity. Written only by the scorer."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Prediction(Artifact):
+    """A predictive distribution for one measurable quantity, frozen before the run.
+
+    :attr:`quantity` says what is measured and where the value will be read;
+    :attr:`quantiles` give q05/q25/q50/q75/q95, so the 50% interval is
+    q25..q75 and the 90% interval q05..q95. A Prediction is made by a
+    :class:`Theory` (a ``predicts`` edge, :attr:`made_by` ``theory``), by an
+    agent's judgement, or by the house prior. Quantity, quantiles, maker and
+    :attr:`registered` are set once at submit and never edited; an agent that
+    adjusts a Theory's prediction registers its own with :attr:`override_of`.
+    The Experiment that measures it points at it with ``tests``.
+
+    Nobody grades a Prediction by hand: :attr:`resolution` is written by the
+    scorer from the measured value.
+    """
+
+    type Source = Literal["theory", "agent", "house-prior"]
+    """Who made the distribution."""
+
+    quantity: dict[str, object] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="JSONB",
+            immutable=True,
+        ),
+    )
+    """What is measured: ``{"key", "better": "lower"|"higher"}`` plus where to
+    read it -- ``ticket``/``r2_key``/``file`` for coord runs, ``run_id`` and
+    ``pair`` for a ledger row, ``parent`` for a delta against a parent run."""
+
+    quantiles: dict[str, float] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="JSONB",
+            immutable=True,
+        ),
+    )
+    """``{"q05", "q25", "q50", "q75", "q95"}``, non-decreasing. Empty only on
+    a legacy interval prediction (labelled ``legacy-interval``), which keeps
+    its ``lo``/``hi`` in :attr:`quantity` and stays out of PIT and coverage."""
+
+    made_by: Source | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="TEXT",
+            sql_check="made_by IN ('theory', 'agent', 'house-prior')",
+            immutable=True,
+        ),
+    )
+    """``theory``, ``agent`` or ``house-prior``."""
+
+    override_of: str | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="TEXT",
+            immutable=True,
+        ),
+    )
+    """The Prediction this one adjusts by hand: a Trackinizer id or a coord
+    id. Both are scored, which shows whether the adjustment beat the law."""
+
+    registered: datetime | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="TIMESTAMPTZ",
+            immutable=True,
+        ),
+    )
+    """When the Prediction was frozen: the server's clock at submit, or
+    coord's own timestamp for a prediction imported from coord."""
+
+    resolution: dict[str, object] | None = field(
+        default=None,
+        metadata=ColumnSpec(
+            applies_to_inquiry_kinds=frozenset({"Prediction"}),
+            sql_type="JSONB",
+            route_editable=False,
+        ),
+    )
+    """The scorer's verdict: ``{"status", "observed", "pit", "is50", "is90",
+    "logscore", "cover50", "cover90", "optimism", "scorer", "resolved"}``.
+    ``status`` is ``open``, ``resolved``, ``void``, ``unresolvable`` or
+    ``late``. Written only by the scorer."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

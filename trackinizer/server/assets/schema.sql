@@ -305,6 +305,12 @@ CREATE TABLE IF NOT EXISTS session_bodies (
 --   proves                 Artifact → {Belief,Experiment}  (load-bearing)
 --   favors                 Artifact → {Belief,Experiment}  (context)
 --   supersedes             Inquiry → Inquiry   (successor → predecessor)
+--   predicts               Prediction → Theory
+--   tests                  Experiment → Prediction
+--   rivals                 Theory → Theory     (lower seq first)
+--   fits                   Experiment → Theory
+--   assumes                Belief → Belief     (dependent → assumption)
+--   about                  Belief → Theory
 --
 -- For-vs-against is not a separate edge kind: it is the sign of the
 -- ``valence`` metadata column (positive supports the claim, negative argues
@@ -356,6 +362,22 @@ CREATE TABLE IF NOT EXISTS edges (
      OR (edge_kind = 'cites_paper'
             AND from_kind IN ({paper_kinds})
             AND to_kind IN ({paper_kinds}))
+     -- The theory edges (docs/epistemy.md): predicts Prediction -> Theory,
+     -- tests Experiment -> Prediction, rivals Theory -> Theory (lower seq
+     -- first), fits Experiment -> Theory, assumes Belief -> Belief (dependent
+     -- -> assumption), about Belief -> Theory.
+     OR (edge_kind = 'predicts'
+            AND from_kind = 'Prediction' AND to_kind = 'Theory')
+     OR (edge_kind = 'tests'
+            AND from_kind = 'Experiment' AND to_kind = 'Prediction')
+     OR (edge_kind = 'rivals'
+            AND from_kind = 'Theory' AND to_kind = 'Theory')
+     OR (edge_kind = 'fits'
+            AND from_kind = 'Experiment' AND to_kind = 'Theory')
+     OR (edge_kind = 'assumes'
+            AND from_kind = 'Belief' AND to_kind = 'Belief')
+     OR (edge_kind = 'about'
+            AND from_kind = 'Belief' AND to_kind = 'Theory')
     )
 );
 

@@ -615,7 +615,7 @@ the same commit.
 ### Kinds
 
 `Issue`, `Artifact`, `Experiment`, `Paper`, `Belief`, `CodeChange`,
-`WebResult`, `WebSearch`, `AgentSession`.
+`WebResult`, `WebSearch`, `AgentSession`, `Theory`, `Prediction`.
 
 ### Issue kinds (`issue_kind`)
 
@@ -628,7 +628,13 @@ the same commit.
 `google_scholar_cluster_id`, `google_scholar_cites_id`,
 `abstract`, `publication_type`, `venue`, `subvenue`, `publish_date`, `query`,
 `provider`, `sha`, `url`,
-`cli`, `cli_session_id`, `started`.
+`cli`, `cli_session_id`, `started`,
+`explains`, `form`, `variables`, `parameters`, `regime`, `fit_ref`,
+`quantity`, `quantiles`, `made_by`, `override_of`,
+`needs_review`, `reviewed_at`, `review_note`.
+
+A Prediction's `quantity`, `quantiles`, `made_by` and `override_of` are set
+when it is created and never edited: a Prediction is frozen before its run.
 
 ### List fields (`LIST_FIELDS`)
 
@@ -644,7 +650,9 @@ the same commit.
 `narrows`, `narrowed_by`, `broadens`, `broadened_by`, `requires`, `required_by`,
 `blocked_by`, `blocks`, `produced`, `produced_by`, `produces`, `proves`,
 `proved_by`, `disproves`, `disproved_by`, `favors`, `favored_by`, `disfavors`,
-`disfavored_by`, `supersedes`, `superseded_by`, `cites`, `cited_by`.
+`disfavored_by`, `supersedes`, `superseded_by`, `cites`, `cited_by`,
+`predicts`, `predicted_by`, `tests`, `tested_by`, `rivals`, `rivalled_by`,
+`fits`, `fitted_by`, `assumes`, `assumed_by`, `about`, `discussed_by`.
 
 "proved/disproved" are intentionally hyperbolic. Epistemologically,
 "credited/discredited" would be more precise, but Trackinizer uses
@@ -675,6 +683,15 @@ paper.
 
     trax paper 5 cites paper 8   -> stores Paper#5 -> Paper#8
     trax paper 8 cited_by paper 5 -> stores Paper#5 -> Paper#8
+
+The theory edges (`docs/epistemy.md`) carry no valence:
+
+    trax prediction 4 predicts theory 2    -> Prediction#4 -> Theory#2
+    trax experiment 9 tests prediction 4   -> Experiment#9 -> Prediction#4
+    trax theory 1 rivals theory 2          -> Theory#1 -> Theory#2 (lower seq first)
+    trax experiment 7 fits theory 2        -> Experiment#7 -> Theory#2
+    trax belief 6 assumes belief 42        -> Belief#6 -> Belief#42
+    trax belief 50 about theory 2          -> Belief#50 -> Theory#2
 
 ### Relation-only keywords (`RELATION_ALIASES` minus edges)
 

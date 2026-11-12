@@ -34,6 +34,8 @@ from trackinizer.wire.bodies import (
     SubmitIssue,
     SubmitItem,
     SubmitPaper,
+    SubmitPrediction,
+    SubmitTheory,
     SubmitWebResult,
     SubmitWebSearch,
 )
@@ -62,6 +64,8 @@ _BODY_BY_KIND: dict[str, type[SubmitBase]] = {
         SubmitWebResult,
         SubmitWebSearch,
         SubmitAgentSession,
+        SubmitTheory,
+        SubmitPrediction,
     )
 }
 

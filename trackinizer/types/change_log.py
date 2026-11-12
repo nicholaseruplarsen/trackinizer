@@ -118,6 +118,18 @@ class Snapshot:
     agentsession_started: datetime | None = None
     agentsession_ended: datetime | None = None
     agentsession_rooms: tuple[str, ...] | None = None
+    belief_earned_confidence: float | None = None
+    belief_needs_review: bool | None = None
+    belief_reviewed_at: datetime | None = None
+    belief_review_note: str | None = None
+    theory_explains: str | None = None
+    theory_form: str | None = None
+    theory_variables: dict[str, object] | None = None
+    theory_parameters: dict[str, object] | None = None
+    theory_regime: object | None = None
+    theory_fit_ref: str | None = None
+    theory_record: dict[str, object] | None = None
+    prediction_resolution: dict[str, object] | None = None
 
     subscribers: tuple[Inquiry.Actor, ...] | None = None
     """Mirrors :attr:`Inquiry.subscribers`."""
@@ -240,6 +252,21 @@ class Change:
         "agentsession_started",
         "agentsession_ended",
         "agentsession_rooms",
+        # Belief: the earned confidence and the review state.
+        "belief_earned_confidence",
+        "belief_needs_review",
+        "belief_reviewed_at",
+        "belief_review_note",
+        # Theory-only.
+        "theory_explains",
+        "theory_form",
+        "theory_variables",
+        "theory_parameters",
+        "theory_regime",
+        "theory_fit_ref",
+        "theory_record",
+        # Prediction-only: everything else on a Prediction is frozen at submit.
+        "prediction_resolution",
         # Edge-table mutations (decomposition, sequencing, provenance,
         # citations, supersedes); the peer triple rides on the Snapshot's
         # peer_* fields. These name an event, not a column, so they keep their
@@ -383,6 +410,18 @@ class _SnapshotKwargs(TypedDict, total=False):
     agentsession_started: datetime | None
     agentsession_ended: datetime | None
     agentsession_rooms: tuple[str, ...] | None
+    belief_earned_confidence: float | None
+    belief_needs_review: bool | None
+    belief_reviewed_at: datetime | None
+    belief_review_note: str | None
+    theory_explains: str | None
+    theory_form: str | None
+    theory_variables: dict[str, object] | None
+    theory_parameters: dict[str, object] | None
+    theory_regime: object | None
+    theory_fit_ref: str | None
+    theory_record: dict[str, object] | None
+    prediction_resolution: dict[str, object] | None
     subscribers: tuple[Inquiry.Actor, ...] | None
     marginal_cost: Cost | None
 

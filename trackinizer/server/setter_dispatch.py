@@ -50,6 +50,8 @@ from trackinizer.types.inquiries import (
     Inquiry,
     Issue,
     Paper,
+    Prediction,
+    Theory,
     WebResult,
     WebSearch,
 )
@@ -217,6 +219,8 @@ COLUMN_SPECS: dict[str, ColumnSpec] = _column_specs_for(
     WebResult,
     WebSearch,
     AgentSession,
+    Theory,
+    Prediction,
 )
 """``storage_name -> ColumnSpec`` aggregated from every Inquiry subclass.
 

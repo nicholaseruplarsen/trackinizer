@@ -36,6 +36,7 @@ from trackinizer.types.inquiries import (
     Inquiry,
     Issue,
     Paper,
+    Prediction,
     is_valid_source,
 )
 from trackinizer.wire.json_types import UtcDatetime
@@ -67,6 +68,8 @@ __all__ = [
     "SubmitIssue",
     "SubmitItem",
     "SubmitPaper",
+    "SubmitPrediction",
+    "SubmitTheory",
     "SubmitWebResult",
     "SubmitWebSearch",
 ]
@@ -271,6 +274,81 @@ class SubmitPaper(SubmitBase):
         return value
 
 
+class SubmitTheory(SubmitBase):
+    """Submit body for a new Theory: a parametric law with its current fit."""
+
+    kind: Literal["Theory"] = "Theory"
+    explains: str | None = None
+    form: str | None = None
+    variables: dict[str, object] | None = None
+    parameters: dict[str, object] | None = None
+    regime: object | None = None
+    fit_ref: str | None = None
+    rivals: list[uuid.UUID] = Field(default_factory=list)
+    """Existing Theories this one rivals; each pair is stored once, lower seq
+    first."""
+
+
+QUANTILE_KEYS: tuple[str, ...] = ("q05", "q25", "q50", "q75", "q95")
+"""The quantiles a :class:`Prediction` states, in order."""
+
+LEGACY_INTERVAL_LABEL = "legacy-interval"
+"""Labels a Prediction migrated from a ``lo..hi`` pre-registration: it has no
+quantiles and stays out of PIT and coverage."""
+
+
+class SubmitPrediction(SubmitBase):
+    """Submit body for a new Prediction, frozen at submit.
+
+    The server stamps :attr:`Prediction.registered` with its own clock; a
+    client cannot backdate it.
+    """
+
+    kind: Literal["Prediction"] = "Prediction"
+    quantity: dict[str, object]
+    quantiles: dict[str, float] | None = None
+    made_by: Prediction.Source = "agent"
+    override_of: str | None = None
+    theory: uuid.UUID | None = None
+    """The Theory whose fit made it; stamps a ``predicts`` edge."""
+
+    @field_validator("quantity", mode="after")
+    @classmethod
+    def _validate_quantity(cls, value: dict[str, object]) -> dict[str, object]:
+        if not str(value.get("key") or value.get("metric") or "").strip():
+            raise ValueError("quantity needs a key (or metric) naming what is measured")
+        if value.get("better", "lower") not in ("lower", "higher"):
+            raise ValueError("quantity.better is lower or higher")
+        return value
+
+    @field_validator("quantiles", mode="after")
+    @classmethod
+    def _validate_quantiles(
+        cls, value: dict[str, float] | None
+    ) -> dict[str, float] | None:
+        if value is None:
+            return None
+        if set(value) != set(QUANTILE_KEYS):
+            raise ValueError(f"quantiles are exactly {', '.join(QUANTILE_KEYS)}")
+        ordered = [float(value[k]) for k in QUANTILE_KEYS]
+        if any(b < a for a, b in zip(ordered, ordered[1:], strict=False)):
+            raise ValueError("quantiles must be non-decreasing")
+        if ordered[0] == ordered[-1]:
+            raise ValueError("quantiles must not all be equal")
+        return {k: float(value[k]) for k in QUANTILE_KEYS}
+
+    @model_validator(mode="after")
+    def _quantiles_or_legacy(self) -> SubmitPrediction:
+        if self.quantiles is None and LEGACY_INTERVAL_LABEL not in (self.labels or ()):
+            raise ValueError(
+                "a Prediction states quantiles q05..q95; only a migrated "
+                f"{LEGACY_INTERVAL_LABEL!r} row may omit them",
+            )
+        if self.made_by == "theory" and self.theory is None:
+            raise ValueError("made_by=theory needs theory: the Theory that made it")
+        return self
+
+
 class Citation(BaseModel):
     """One inline citation on a :class:`SubmitBelief`: which artifact, how strong.
 
@@ -457,7 +535,9 @@ SubmitItem = Annotated[
     | SubmitCodeChange
     | SubmitWebResult
     | SubmitWebSearch
-    | SubmitAgentSession,
+    | SubmitAgentSession
+    | SubmitTheory
+    | SubmitPrediction,
     Field(discriminator="kind"),
 ]
 

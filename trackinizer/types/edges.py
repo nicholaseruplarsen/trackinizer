@@ -102,6 +102,17 @@ class Edge:
         proves       -> Artifact.proves / {Belief,Experiment}.proved_by
         favors       -> Artifact.favors / {Belief,Experiment}.favored_by
         cites_paper  -> Paper.cites / Paper.cited_by
+        predicts     -> Prediction.predicts / Theory.predicted_by
+        tests        -> Experiment.tests / Prediction.tested_by
+        rivals       -> Theory.rivals / Theory.rivalled_by
+        fits         -> Experiment.fits / Theory.fitted_by
+        assumes      -> Belief.assumes / Belief.assumed_by
+        about        -> Belief.about / Theory.discussed_by
+
+    The six theory edges (``predicts`` .. ``about``) are documented in
+    ``docs/epistemy.md``. ``assumes``, ``fits`` and ``about`` are often linked
+    long after both ends exist, so their child may be older than their parent;
+    they are dated by when they were linked, not by their endpoints' ages.
 
     A few relationships are kept as row-level arrays on ``inquiries`` instead of
     edges, because they are inherently ordered, mostly appended to, and read in
@@ -126,6 +137,12 @@ class Edge:
         "favors",
         "supersedes",
         "cites_paper",
+        "predicts",
+        "tests",
+        "rivals",
+        "fits",
+        "assumes",
+        "about",
     ]
     """Closed set, mirrored in the schema CHECK constraint. Every kind names the
     edge from the child's view: the stored edge points child -> parent (from =
@@ -267,6 +284,8 @@ type KindGroup = Literal[
     "experiment",
     "claimable",
     "paper",
+    "theory",
+    "prediction",
 ]
 """A named set of inquiry kinds an edge endpoint admits. Resolved to the
 concrete kind tuple by :func:`kind_group_members`; the schema's edge-validity
@@ -314,6 +333,10 @@ def kind_group_members(group: KindGroup) -> tuple[Inquiry.InquiryKind, ...]:
             return ("Belief", "Experiment")
         case "paper":
             return ("Paper",)
+        case "theory":
+            return ("Theory",)
+        case "prediction":
+            return ("Prediction",)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -485,6 +508,78 @@ EDGE_POLICIES: Mapping[Edge.Kind, EdgeKindPolicy] = MappingProxyType(
             to_kinds="paper",
             enforces_acyclicity=False,
         ),
+        "predicts": EdgeKindPolicy(
+            description=(
+                "predicts stores Prediction -> Theory: the Prediction the law's "
+                "current fit made points up to the older Theory. The Theory is "
+                "the dependent: its record moves when a Prediction resolves."
+            ),
+            forward_label="predicts",
+            inverse_label="predicted_by",
+            from_kinds="prediction",
+            to_kinds="theory",
+            cascade_dependent="to",
+        ),
+        "tests": EdgeKindPolicy(
+            description=(
+                "tests stores Experiment -> Prediction: the run that measures the "
+                "quantity points up to the Prediction frozen before it. An "
+                "Experiment older than its Prediction makes the Prediction late. "
+                "The Prediction is the dependent: it resolves from the result."
+            ),
+            forward_label="tests",
+            inverse_label="tested_by",
+            from_kinds="experiment",
+            to_kinds="prediction",
+            cascade_dependent="to",
+        ),
+        "rivals": EdgeKindPolicy(
+            description=(
+                "rivals stores Theory -> Theory once per pair, lower seq first, so "
+                "the pair has one stable key. Symmetric in meaning: both Theories "
+                "explain the same quantity and are weighed against each other by "
+                "log score on the quantities both predicted."
+            ),
+            forward_label="rivals",
+            inverse_label="rivalled_by",
+            from_kinds="theory",
+            to_kinds="theory",
+        ),
+        "fits": EdgeKindPolicy(
+            description=(
+                "fits stores Experiment -> Theory: a run whose measurement the "
+                "Theory's parameters were fitted on. Dated by when it was linked. "
+                "The Theory is the dependent: a moved fit point means a refit."
+            ),
+            forward_label="fits",
+            inverse_label="fitted_by",
+            from_kinds="experiment",
+            to_kinds="theory",
+            cascade_dependent="to",
+        ),
+        "assumes": EdgeKindPolicy(
+            description=(
+                "assumes stores Belief -> Belief: the dependent Belief points to "
+                "the Belief it assumes, even when the assumption is younger. "
+                "Dated by when it was linked. The dependent (from) side is "
+                "flagged needs_review when its assumption changes."
+            ),
+            forward_label="assumes",
+            inverse_label="assumed_by",
+            from_kinds="belief",
+            to_kinds="belief",
+        ),
+        "about": EdgeKindPolicy(
+            description=(
+                "about stores Belief -> Theory: a Belief that states a claim about "
+                "a law. Its earned confidence is the Theory's posterior weight "
+                "against its rivals. Dated by when it was linked."
+            ),
+            forward_label="about",
+            inverse_label="discussed_by",
+            from_kinds="belief",
+            to_kinds="theory",
+        ),
     },
 )
 """The full ``edge_kind -> EdgeKindPolicy`` table; the single source of truth
@@ -551,7 +646,19 @@ PRODUCED_INFERENCE_SUPPRESSED: frozenset[Edge.Kind] = frozenset({"produced_by"})
 # every kind either ranks in the inference or is explicitly neutral, so a new
 # kind cannot silently fall through with undefined provenance behavior.
 PRODUCED_INFERENCE_NEUTRAL: frozenset[Edge.Kind] = frozenset(
-    {"cites_paper", "proves", "favors"},
+    {
+        "cites_paper",
+        "proves",
+        "favors",
+        # The theory edges record what a law predicts, tests, rivals, fits,
+        # assumes or is about: none says one end produced the other.
+        "predicts",
+        "tests",
+        "rivals",
+        "fits",
+        "assumes",
+        "about",
+    },
 )
 
 

@@ -141,6 +141,12 @@ LABELS_BY_EDGE_KIND: Final[Mapping[Edge.Kind, tuple[str, str]]] = {
     "supersedes": ("successor", "predecessor"),
     # cites_paper stores citing paper -> cited paper (historical bibliography).
     "cites_paper": ("citing paper", "cited paper"),
+    "predicts": ("prediction", "theory"),
+    "tests": ("experiment", "tested prediction"),
+    "rivals": ("theory", "rival theory"),
+    "fits": ("fit experiment", "fitted theory"),
+    "assumes": ("dependent belief", "assumption"),
+    "about": ("belief", "theory"),
 }
 
 # The against-citation spelling for each citation kind. For-vs-against is the
