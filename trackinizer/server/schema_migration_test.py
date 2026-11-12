@@ -32,6 +32,7 @@ from trackinizer.lib import postgres
 from trackinizer.lib.postgres.testing import reset_schema
 from trackinizer.server.embedders.stub import StubEmbedder
 from trackinizer.server.notify import NOTIFY_CHANNEL
+from trackinizer.server.schema_gen import substitute_schema_placeholders
 from trackinizer.server.sql import load_sql
 from trackinizer.server.store.core import Store
 from trackinizer.wire.filters import NON_NULLABLE_COLUMNS
@@ -1241,6 +1242,117 @@ async def test_migration_045_matches_the_baseline_credit_entries_table(
             )
 
     assert migrated == baseline
+
+
+_PRE_046_INQUIRY_KINDS = (
+    "'Issue', 'Artifact', 'Experiment', 'Paper', 'Belief', 'CodeChange', "
+    "'WebResult', 'WebSearch', 'AgentSession'"
+)
+_PRE_046_EDGE_KINDS = (
+    "'narrows', 'requires', 'produced_by', 'proves', 'favors', 'supersedes', 'cites_paper'"
+)
+
+
+async def _catalog_sets(
+    conn: postgres.Conn,
+) -> dict[str, set[tuple[str, ...]]]:
+    """The three tables 046 touches, as name-blind sets of columns and constraints.
+
+    Name-blind because a fresh install leaves the per-kind CHECKs anonymous
+    (``inquiries_checkN``, numbered by position) where the migration names them.
+    """
+    out: dict[str, set[tuple[str, ...]]] = {}
+    for table in ("inquiries", "change_log", "edges"):
+        columns, constraints, indexes = await _table_shape(conn, table)
+        out[f"{table}.columns"] = {
+            tuple(str(c[k]) for k in ("column_name", "data_type", "is_nullable", "column_default"))
+            for c in columns
+        }
+        out[f"{table}.constraints"] = {(d,) for _, d in constraints}
+        out[f"{table}.indexes"] = {(i,) for i in indexes}
+    out["sequences"] = {
+        (str(r["sequencename"]),)
+        for r in await conn.fetch("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'")
+    }
+    return out
+
+
+@pytest.mark.db_pglite
+@pytest.mark.asyncio(loop_scope="session")
+async def test_migration_046_matches_the_baseline_theory_layer(
+    pglite_engine: postgres.PGliteEngine,
+) -> None:
+    """A pre-046 database migrated by 046 equals a fresh install.
+
+    Bootstrap builds the baseline, which is then put back into the pre-046 shape:
+    the Theory, Prediction and Belief-review columns and their mirrors dropped,
+    the two sequences dropped, and the kind and edge CHECKs narrowed to the old
+    lists. Replaying ``schema.046`` must restore every column, constraint and
+    sequence, and a second replay is a no-op.
+    """
+    await reset_schema(pglite_engine)
+    await Store(pglite_engine, embed=StubEmbedder()).bootstrap()
+    added = [
+        "belief_earned_confidence", "belief_needs_review", "belief_reviewed_at",
+        "belief_review_note", "theory_explains", "theory_form", "theory_variables",
+        "theory_parameters", "theory_regime", "theory_fit_ref", "theory_record",
+        "prediction_quantity", "prediction_quantiles", "prediction_made_by",
+        "prediction_override_of", "prediction_registered", "prediction_resolution",
+    ]
+    async with pglite_engine.acquire() as conn:
+        baseline = await _catalog_sets(conn)
+        assert ("theory_form", "text", "YES", "None") in baseline["inquiries.columns"]
+
+        for column in added:
+            await conn.execute(f"ALTER TABLE inquiries DROP COLUMN {column}")
+            for side in ("old", "new"):
+                await conn.execute(f"ALTER TABLE change_log DROP COLUMN IF EXISTS {side}_{column}")
+        await conn.execute("DROP SEQUENCE seq_theory, seq_prediction")
+        # The kind matrix names a change kind, not a column, so it outlives the drop.
+        for name in await conn.fetch(
+            "SELECT conname FROM pg_constraint WHERE conrelid = 'change_log'::regclass "
+            "AND pg_get_constraintdef(oid) ~ $1",
+            "'(belief_earned_confidence|belief_needs_review|belief_reviewed_at|"
+            "belief_review_note|theory_[a-z_]+|prediction_resolution)'",
+        ):
+            await conn.execute(f"ALTER TABLE change_log DROP CONSTRAINT {name['conname']}")
+        await conn.execute(
+            "ALTER TABLE inquiries DROP CONSTRAINT inquiries_kind_check, ADD CONSTRAINT "
+            f"inquiries_kind_check CHECK (kind IN ({_PRE_046_INQUIRY_KINDS}))"
+        )
+        for column in ("subject_kind", "old_peer_kind", "new_peer_kind"):
+            nullable = "" if column == "subject_kind" else f"{column} IS NULL OR "
+            await conn.execute(
+                f"ALTER TABLE change_log DROP CONSTRAINT change_log_{column}_check, ADD "
+                f"CONSTRAINT change_log_{column}_check CHECK ({nullable}{column} IN "
+                f"({_PRE_046_INQUIRY_KINDS}))"
+            )
+        for column in ("old_peer_edge_kind", "new_peer_edge_kind"):
+            await conn.execute(
+                f"ALTER TABLE change_log DROP CONSTRAINT change_log_{column}_check, ADD "
+                f"CONSTRAINT change_log_{column}_check CHECK ({column} IS NULL OR {column} "
+                f"IN ({_PRE_046_EDGE_KINDS}))"
+            )
+        edge_check = await conn.fetchval(
+            "SELECT conname FROM pg_constraint WHERE conrelid = 'edges'::regclass "
+            "AND pg_get_constraintdef(oid) LIKE '%cites_paper%'"
+        )
+        await conn.execute(f"ALTER TABLE edges DROP CONSTRAINT {edge_check}")
+        await conn.execute(
+            "ALTER TABLE edges ADD CONSTRAINT edges_old_check CHECK ("
+            "edge_kind IN ('narrows', 'requires') AND from_kind = 'Issue' "
+            "OR edge_kind = 'cites_paper')"
+        )
+        narrowed = await _catalog_sets(conn)
+        assert narrowed != baseline
+
+        await conn.execute(substitute_schema_placeholders(load_sql("schema.046")))
+        migrated = await _catalog_sets(conn)
+        await conn.execute(substitute_schema_placeholders(load_sql("schema.046")))
+        replayed = await _catalog_sets(conn)
+
+    assert migrated == baseline
+    assert replayed == baseline
 
 
 if __name__ == "__main__":
