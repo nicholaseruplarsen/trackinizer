@@ -853,16 +853,73 @@ async def resolve_native(
     return changed
 
 
+_N = r"[+\-\u2212]?\d+(?:\.\d+)?"
+_DELTA_TEXT = (
+    # "delta R1-R0 +4.94 pts CI90 [+1.92,+7.79]"
+    re.compile(rf"\bdelta\b[^\[\]]{{0,40}}?({_N})\s*pts?,?\s*(?:CI90\s*)?\[\s*{_N}\s*,\s*{_N}\s*\]"),
+    # "HU S2F vs S2FP +3.93 [2.15,5.75]", "vs L5_full -6.1 pts CI90 [-10.7,-1.8]"
+    re.compile(rf"\bvs\b[^\[\]]{{0,120}}?({_N})\s*(?:pts?\s*)?(?:CI90\s*)?\[\s*{_N}\s*,\s*{_N}\s*\]"),
+)
+
+
+def reported_delta(outcome: str | None) -> float | None:
+    """The realised delta an agent reported at the head of a prereg outcome.
+
+    Most Windrunner runs were scored on boxes whose ledgers this server cannot
+    read, so the measured number survives only in the outcome text, written in
+    one regular form. This is read for the house prior only (the distribution
+    of realised effects), never to grade a prediction.
+    """
+    head = (outcome or "")[:500]
+    for pattern in _DELTA_TEXT:
+        found = pattern.search(head)
+        if found:
+            return float(found.group(1).replace("\u2212", "-"))
+    return None
+
+
+async def outcome_times(store: Store, graph: _Graph) -> dict[uuid.UUID, datetime]:
+    """When each Experiment's outcome was first written, from the change log."""
+    ids = list(graph.experiments)
+    async with store.engine.acquire() as conn:
+        found = {
+            r["subject_id"]: r["at"]
+            for r in await conn.fetch(
+                "SELECT subject_id, min(created) AS at FROM change_log "
+                "WHERE subject_id = ANY($1) AND kind = 'experiment_outcome' "
+                "GROUP BY subject_id",
+                ids,
+            )
+        }
+    # An outcome given at submit has no edit row: it was written when created.
+    return {e: found.get(e, graph.experiments[e].created) for e in ids}
+
+
 def house_prior_points(
-    graph: _Graph, ledger: _Ledger, *, metric: str
+    graph: _Graph,
+    ledger: _Ledger,
+    *,
+    metric: str,
+    written: Mapping[uuid.UUID, datetime] | None = None,
 ) -> list[tuple[datetime, float, uuid.UUID]]:
-    """Every realised value of ``metric`` among Predictions, with when it landed."""
+    """Every realised value of ``metric`` among Predictions, with when it landed.
+
+    From the ledger when the run is there; otherwise from the number the prereg
+    Experiment's outcome reports, dated by when that outcome was first written.
+    """
     points: list[tuple[datetime, float, uuid.UUID]] = []
     for prediction in graph.predictions.values():
         quantity = prediction.quantity or {}
         if str(quantity.get("metric") or quantity.get("key")) != metric:
             continue
         found = ledger.observe(quantity)
+        if found is None:
+            for eid in graph.into(prediction.id, "tests"):
+                experiment = graph.experiments.get(eid)
+                value = reported_delta(experiment.outcome) if experiment else None
+                if experiment is not None and value is not None:
+                    found = (value, (written or {}).get(eid, experiment.modified))
+                    break
         if found is not None:
             points.append((found[1], found[0], prediction.id))
     return sorted(points)
@@ -913,7 +970,7 @@ async def fit_house_prior(
         "quantity_kind": metric,
         "quantiles": {k: round(v, 4) for k, v in quantiles.items()},
         "n": len(points),
-        "source": "trackinizer house prior: realised outcomes of resolved predictions on Windrunner",
+        "source": "trackinizer house prior: realised outcomes of Windrunner pre-registrations (ledger, else the delta the outcome reports)",
         "fitted_at": now.isoformat(),
     }
     parameters = {k: {"mean": round(v, 4)} for k, v in quantiles.items()}
@@ -944,7 +1001,8 @@ async def fit_house_prior(
     theory = graph.theories[theory_id]
     if theory.parameters != parameters:
         await store.set_parameters(theory_id, parameters, actor=ACTOR, reason=f"refit on n={len(points)}")
-        record = {**(theory.record or {}), "n": len(points), "fitted_at": now.isoformat(), "scorer": "trackinizer"}
+    if theory.parameters != parameters or (theory.record or {}).get("n") != len(points):
+        record = {"n": len(points), "fitted_at": now.isoformat(), "scorer": "trackinizer"}
         await store.set_record(theory_id, record, actor=ACTOR)
     return prior
 
@@ -1032,6 +1090,8 @@ async def propagate_review(store: Store, graph: _Graph) -> list[dict[str, object
         ]
         if because:
             flagged.append({"belief": belief.seq, "because": because})
+        if bool(because) == bool(belief.needs_review):
+            continue
         await _set(
             store,
             belief,
@@ -1094,7 +1154,12 @@ class KnowledgeService:
         report.created += await migrate_preregs(store, graph)
         report.updated += await resolve_native(store, graph, ledger, now=now)
         graph = await _Graph.read(store)
-        points = house_prior_points(graph, ledger, metric=self.house_prior_metric)
+        points = house_prior_points(
+            graph,
+            ledger,
+            metric=self.house_prior_metric,
+            written=await outcome_times(store, graph),
+        )
         self.backtest = house_prior_backtest(graph, points)
         prior = await fit_house_prior(store, graph, points, metric=self.house_prior_metric, now=now)
         if prior is not None:

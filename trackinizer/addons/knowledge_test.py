@@ -311,3 +311,19 @@ def test_snapshot_reads_a_pulled_mirror(tmp_path: Path) -> None:
     assert [t["id"] for t in found.tickets] == ["e1-0001"]
     assert [t["id"] for t in found.theories["e1"]] == ["T"]
     assert found.status["e1"]["flags"] == ["x"]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "value"),
+    [
+        ("HIT. HU S2F vs S2FP +3.93 [2.15,5.75] (pred 1..6).", 3.93),
+        ("MISS (low). BE L5_hyb vs L5_full -6.1 pts CI90 [-10.7,-1.8] (pred 0..8)", -6.1),
+        ("MISS (high). DE wind skill R0 -24.3 -> R1 -19.3; delta R1-R0 +4.94 pts CI90 [+1.92,+7.79]", 4.94),
+        ("MISS (low): F26L_blend_full_DK2 delta +4.92 pts, CI90 [1.08,8.23] vs prereg [5,18]", 4.92),
+        ("HIT. no number here", None),
+    ],
+)
+def test_reported_delta_reads_the_head_of_an_outcome(outcome: str, value: float | None) -> None:
+    from trackinizer.addons.knowledge import reported_delta
+
+    assert reported_delta(outcome) == value
