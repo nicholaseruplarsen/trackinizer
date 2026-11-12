@@ -57,3 +57,45 @@ The provenance edge needs a verb for "A came to be from B." To match the other e
 | ascends | `A ascends B` | wrong tree-direction ("rises above"); muddies parent/child |
 | descends | `A descends B` | best coinage, but a coinage; overruled for `produced_by` (see Decision above) |
 | **produced_by / produces** | `A produced_by B` / `B produces A` | **chosen** -- standard English passive/active pair; breaks the append-`s` rule but needs no coinage |
+
+## Theories and Predictions
+
+From the 2026-11-12 epistemology review (`rs-shared/notes/trackinizer_epistemology_review.md`, §5).
+A Belief records a verdict at a point; a **Theory** is a parametric law that predicts across a range, and a
+**Prediction** is a quantile forecast that tests it. Both are Artifacts.
+
+```
+                 Theory ◁──rivals── Theory          (one edge per pair, lower seq first)
+                ▲  ▲  ▲
+       predicts │  │  │ about
+                │  │ fits
+       Prediction  │  Belief ──assumes──▷ Belief     (dependent → assumption)
+            ▲      │
+      tests │   Experiment
+        Experiment
+```
+
+| Edge | Stored | Means | Dependent (alerted) |
+|---|---|---|---|
+| `predicts` | Prediction → Theory | the law's current fit made this forecast | Theory |
+| `tests` | Experiment → Prediction | the run that measures it; an Experiment older than the Prediction's `registered` makes it `late` | Prediction |
+| `rivals` | Theory → Theory | both explain the same quantity; weighed by log score on quantities both predicted | |
+| `fits` | Experiment → Theory | the law's parameters were fitted on this run (`config.fit_point`) | Theory |
+| `assumes` | Belief → Belief | the dependent assumes the other; a change to the assumption flags the dependent `needs_review` | Belief (from) |
+| `about` | Belief → Theory | the Belief's `earned_confidence` is the Theory's weight against its rivals | Belief (from) |
+
+* None of the six carries valence, and none infers `produced_by`.
+* **Clocks.** `predicts` and `tests` follow creation time (the Prediction is older than the run that tests it).
+  `rivals`, `fits`, `assumes` and `about` are often linked long after both ends exist, so their child may be
+  older than their parent (#6 assumes #42, which is younger): they are dated by when they were **linked**
+  (the `edge_added` change), not by their endpoints' ages.
+* **Frozen.** A Prediction's `quantity`, `quantiles`, `made_by`, `override_of` and `registered` are set at
+  submit and never edited. `registered` is the server's clock, except for Predictions imported from coord,
+  which keep coord's. Its `resolution` (observed, PIT, interval and log scores) is written only by the scorer.
+* **Earned and stated.** A Belief's `confidence` is the author's; `earned_confidence` is computed, only for a
+  Belief with an `about` edge, and stays empty (not 0) until the Theory shares a scored quantity with a rival.
+* **Review.** `needs_review` is set when an assumption's content changed after the Belief was last edited or
+  reviewed; whoever looks clears it, with `review_note` (and `reviewed_at`).
+* The scoring and the importer live in `addons/knowledge.py`, served at `/api/addons/knowledge/summary`.
+  Legacy `prereg` Experiments become Predictions labelled `prereg:<seq>`; those with only `lo..hi` are labelled
+  `legacy-interval` and kept out of PIT and coverage.

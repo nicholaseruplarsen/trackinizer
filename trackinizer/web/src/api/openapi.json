@@ -2769,6 +2769,63 @@
         "title": "FieldSet[Union[PublicationType, NoneType]]",
         "type": "object"
       },
+      "FieldSet_Union_bool__NoneType__": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "mode": {
+            "default": "set",
+            "enum": [
+              "set",
+              "cas"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "FieldSet[Union[bool, NoneType]]",
+        "type": "object"
+      },
       "FieldSet_Union_datetime__NoneType__": {
         "additionalProperties": false,
         "properties": {
@@ -3639,7 +3696,9 @@
           "CodeChange",
           "WebResult",
           "WebSearch",
-          "AgentSession"
+          "AgentSession",
+          "Theory",
+          "Prediction"
         ],
         "type": "string"
       },
@@ -6141,6 +6200,17 @@
             ],
             "title": "Belief Confidence"
           },
+          "belief_earned_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belief Earned Confidence"
+          },
           "belief_judgement": {
             "anyOf": [
               {
@@ -6150,6 +6220,40 @@
                 "type": "null"
               }
             ]
+          },
+          "belief_needs_review": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belief Needs Review"
+          },
+          "belief_review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belief Review Note"
+          },
+          "belief_reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belief Reviewed At"
           },
           "codechange_sha": {
             "anyOf": [
@@ -6460,6 +6564,18 @@
               }
             ]
           },
+          "prediction_resolution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prediction Resolution"
+          },
           "status": {
             "anyOf": [
               {
@@ -6483,6 +6599,86 @@
               }
             ],
             "title": "Subscribers"
+          },
+          "theory_explains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Explains"
+          },
+          "theory_fit_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Fit Ref"
+          },
+          "theory_form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Form"
+          },
+          "theory_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Parameters"
+          },
+          "theory_record": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Record"
+          },
+          "theory_regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Regime"
+          },
+          "theory_variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory Variables"
           },
           "title": {
             "anyOf": [
@@ -6531,6 +6727,14 @@
         },
         "title": "Snapshot",
         "type": "object"
+      },
+      "Source": {
+        "enum": [
+          "theory",
+          "agent",
+          "house-prior"
+        ],
+        "type": "string"
       },
       "StationLayout": {
         "additionalProperties": false,
@@ -6953,6 +7157,8 @@
                   "Experiment": "#/components/schemas/SubmitExperiment",
                   "Issue": "#/components/schemas/SubmitIssue",
                   "Paper": "#/components/schemas/SubmitPaper",
+                  "Prediction": "#/components/schemas/SubmitPrediction",
+                  "Theory": "#/components/schemas/SubmitTheory",
                   "WebResult": "#/components/schemas/SubmitWebResult",
                   "WebSearch": "#/components/schemas/SubmitWebSearch"
                 },
@@ -6985,6 +7191,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/SubmitAgentSession"
+                },
+                {
+                  "$ref": "#/components/schemas/SubmitTheory"
+                },
+                {
+                  "$ref": "#/components/schemas/SubmitPrediction"
                 }
               ]
             },
@@ -7835,6 +8047,361 @@
           "title"
         ],
         "title": "SubmitPaper",
+        "type": "object"
+      },
+      "SubmitPrediction": {
+        "description": "Submit body for a new Prediction, frozen at submit.\n\nThe server stamps :attr:`Prediction.registered` with its own clock; a\nclient cannot backdate it.",
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Actor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "kind": {
+            "const": "Prediction",
+            "default": "Prediction",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
+          "made_by": {
+            "$ref": "#/components/schemas/Source",
+            "default": "agent"
+          },
+          "marginal_cost": {
+            "$ref": "#/components/schemas/Cost"
+          },
+          "override_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Of"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Actor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantiles": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantiles"
+          },
+          "quantity": {
+            "additionalProperties": true,
+            "title": "Quantity",
+            "type": "object"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subscribers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Actor"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscribers"
+          },
+          "theory": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theory"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "quantity"
+        ],
+        "title": "SubmitPrediction",
+        "type": "object"
+      },
+      "SubmitTheory": {
+        "description": "Submit body for a new Theory: a parametric law with its current fit.",
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Actor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "explains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explains"
+          },
+          "fit_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Ref"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "kind": {
+            "const": "Theory",
+            "default": "Theory",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
+          "marginal_cost": {
+            "$ref": "#/components/schemas/Cost"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Actor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "rivals": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Rivals",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subscribers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Actor"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscribers"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "SubmitTheory",
         "type": "object"
       },
       "SubmitWebResult": {
@@ -9294,6 +9861,18 @@
           "agentsession_started",
           "agentsession_ended",
           "agentsession_rooms",
+          "belief_earned_confidence",
+          "belief_needs_review",
+          "belief_reviewed_at",
+          "belief_review_note",
+          "theory_explains",
+          "theory_form",
+          "theory_variables",
+          "theory_parameters",
+          "theory_regime",
+          "theory_fit_ref",
+          "theory_record",
+          "prediction_resolution",
           "edge_added",
           "edge_removed",
           "edge_annotation_changed",
@@ -9311,7 +9890,13 @@
           "proves",
           "favors",
           "supersedes",
-          "cites_paper"
+          "cites_paper",
+          "predicts",
+          "tests",
+          "rivals",
+          "fits",
+          "assumes",
+          "about"
         ],
         "type": "string"
       },
@@ -9342,7 +9927,9 @@
           "CodeChange",
           "WebResult",
           "WebSearch",
-          "AgentSession"
+          "AgentSession",
+          "Theory",
+          "Prediction"
         ],
         "type": "string"
       },
@@ -10749,6 +11336,300 @@
         "summary": "Set Judgement Route"
       }
     },
+    "/api/belief/{target_id}/needs_review": {
+      "delete": {
+        "operationId": "unset_needs_review_route_api_belief__target_id__needs_review_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Needs Review Route"
+      },
+      "put": {
+        "operationId": "set_needs_review_route_api_belief__target_id__needs_review_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_bool__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Needs Review Route"
+      }
+    },
+    "/api/belief/{target_id}/review_note": {
+      "delete": {
+        "operationId": "unset_review_note_route_api_belief__target_id__review_note_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Review Note Route"
+      },
+      "put": {
+        "operationId": "set_review_note_route_api_belief__target_id__review_note_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_str__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Review Note Route"
+      }
+    },
+    "/api/belief/{target_id}/reviewed_at": {
+      "delete": {
+        "operationId": "unset_reviewed_at_route_api_belief__target_id__reviewed_at_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Reviewed At Route"
+      },
+      "put": {
+        "operationId": "set_reviewed_at_route_api_belief__target_id__reviewed_at_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_datetime__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Reviewed At Route"
+      }
+    },
     "/api/change_log": {
       "get": {
         "description": "Return a filtered, newest-first slice of the change log.\n\n``kind`` repeats, matching any of its values. Every filter runs before\n``limit``, so a page of other kinds never hides a matching one behind it.\n\n``brief`` sends each snapshot (``old``, ``new``) with its set keys alone,\nand its free text (``title``, ``description``, ...) cut to the first 32\ncharacters: enough to tell a set value from an unset one. Ids, statuses and\nevery other value stay whole.\n\nArgs:\n  request: FastAPI request object for middleware access.\n  identity: Authenticated user identity, viewer-role-gated.\n  since: Minimum timestamp (inclusive); defaults to earliest.\n  after_id: Only rows with id > after_id; used for pagination.\n  actor: Exact match on the change's actor email.\n  subject_id: UUID of the changed inquiry.\n  subject_kind: Inquiry kind of the changed subject.\n  kind: Types of change (field edit, edge mutation, etc.) to keep.\n  limit: Maximum rows returned (validated in [1, MAX_LIST_LIMIT]).\n  brief: Drop unset snapshot keys and cut snapshot text short.\n\nReturns:\n  result: Newest-first ordered list of changes matching the filters.",
@@ -11363,7 +12244,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11440,7 +12327,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11515,7 +12408,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11593,7 +12492,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11670,7 +12575,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11746,7 +12657,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11824,7 +12741,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11900,7 +12823,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -11978,7 +12907,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -12054,7 +12989,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -12132,7 +13073,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -12208,7 +13155,13 @@
                 "proves",
                 "favors",
                 "supersedes",
-                "cites_paper"
+                "cites_paper",
+                "predicts",
+                "tests",
+                "rivals",
+                "fits",
+                "assumes",
+                "about"
               ],
               "title": "Edge Kind",
               "type": "string"
@@ -13237,7 +14190,9 @@
                 "CodeChange",
                 "WebResult",
                 "WebSearch",
-                "AgentSession"
+                "AgentSession",
+                "Theory",
+                "Prediction"
               ],
               "title": "Kind",
               "type": "string"
@@ -16958,6 +17913,594 @@
           }
         },
         "summary": "Read Recent Session Turns Route"
+      }
+    },
+    "/api/theory/{target_id}/explains": {
+      "delete": {
+        "operationId": "unset_explains_route_api_theory__target_id__explains_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Explains Route"
+      },
+      "put": {
+        "operationId": "set_explains_route_api_theory__target_id__explains_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_str__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Explains Route"
+      }
+    },
+    "/api/theory/{target_id}/fit_ref": {
+      "delete": {
+        "operationId": "unset_fit_ref_route_api_theory__target_id__fit_ref_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Fit Ref Route"
+      },
+      "put": {
+        "operationId": "set_fit_ref_route_api_theory__target_id__fit_ref_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_str__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Fit Ref Route"
+      }
+    },
+    "/api/theory/{target_id}/form": {
+      "delete": {
+        "operationId": "unset_form_route_api_theory__target_id__form_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Form Route"
+      },
+      "put": {
+        "operationId": "set_form_route_api_theory__target_id__form_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_str__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Form Route"
+      }
+    },
+    "/api/theory/{target_id}/parameters": {
+      "delete": {
+        "operationId": "unset_parameters_route_api_theory__target_id__parameters_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Parameters Route"
+      },
+      "put": {
+        "operationId": "set_parameters_route_api_theory__target_id__parameters_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_dict_str__object___NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Parameters Route"
+      }
+    },
+    "/api/theory/{target_id}/regime": {
+      "delete": {
+        "operationId": "unset_regime_route_api_theory__target_id__regime_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Regime Route"
+      },
+      "put": {
+        "operationId": "set_regime_route_api_theory__target_id__regime_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_str__NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Regime Route"
+      }
+    },
+    "/api/theory/{target_id}/variables": {
+      "delete": {
+        "operationId": "unset_variables_route_api_theory__target_id__variables_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldMutation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unset Variables Route"
+      },
+      "put": {
+        "operationId": "set_variables_route_api_theory__target_id__variables_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSet_Union_dict_str__object___NoneType__"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutableJSON"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Variables Route"
       }
     },
     "/api/variables": {

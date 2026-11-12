@@ -1154,15 +1154,16 @@ class Theory(Artifact):
     )
     """``{name: {"mean", "lo90", "hi90", "n"?}}``: the current fit."""
 
-    regime: object | None = field(
+    regime: str | None = field(
         default=None,
         metadata=ColumnSpec(
             applies_to_inquiry_kinds=frozenset({"Theory"}),
-            sql_type="JSONB",
+            sql_type="TEXT",
         ),
     )
-    """Where the law claims to hold: free text, or a JSON predicate over
-    zones, targets, periods and market conditions, with any breaks found."""
+    """Where the law claims to hold, and any breaks found: free text, or a
+    JSON predicate over zones, targets, periods and market conditions written
+    as JSON text."""
 
     fit_ref: str | None = field(
         default=None,

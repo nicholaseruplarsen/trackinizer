@@ -133,6 +133,13 @@ def _ts(value: object) -> datetime | None:
     return None
 
 
+def _text(value: object) -> str | None:
+    """A regime as Trackinizer stores it: text, with a JSON predicate written as JSON."""
+    if value is None or isinstance(value, str):
+        return value
+    return json.dumps(value, sort_keys=True)
+
+
 def _num(value: object) -> float | None:
     return (
         float(value)
@@ -521,7 +528,7 @@ async def _import_theory(
         "form": theory.get("form"),
         "variables": theory.get("variables"),
         "parameters": theory.get("parameters"),
-        "regime": theory.get("regime"),
+        "regime": _text(theory.get("regime")),
         "fit_ref": theory.get("fit_ref"),
     }
     if key not in graph.labels:

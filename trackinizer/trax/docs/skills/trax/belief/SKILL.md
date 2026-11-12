@@ -36,6 +36,18 @@ Do NOT model a paper citing a paper as a Belief citation — that is `cites_pape
 (see `../paper/SKILL.md`). A Belief is a *claim*; a Paper is *evidence*. "Two papers agree"
 is expressed as both `proves`/`favors` the same Belief, not one citing the other.
 
+## Assumptions, Theories and earned confidence
+
+- When a Belief depends on another, link it: `trax belief 6 assumes belief 42`
+  (the dependent points to its assumption, whichever is older). When the
+  assumption changes, the dependent is flagged `needs_review`.
+- Clear the flag only after you have looked: `trax belief 6 review_note to "still
+  holds: the 06Z gain was re-measured on the gate-60 window" needs_review to false`.
+- A Belief about a law links to it: `trax belief 50 about theory 3`. Its
+  `earned_confidence` is then the Theory's weight against its rivals, shown next
+  to your stated `confidence`. A large gap between them is a finding in itself.
+  `earned_confidence` is written by the scorer; never set it.
+
 ## Expectations
 
 - One proposition per Belief; split compound claims.

@@ -1033,7 +1033,7 @@ class _EditMixin(_CascadeAuditMixin):
     async def set_regime(
         self,
         target_id: UUID,
-        value: object | None,
+        value: str | None,
         *,
         api_key_id: UUID | None = None,
         actor: Inquiry.Actor,

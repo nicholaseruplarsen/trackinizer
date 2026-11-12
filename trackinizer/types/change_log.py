@@ -126,7 +126,7 @@ class Snapshot:
     theory_form: str | None = None
     theory_variables: dict[str, object] | None = None
     theory_parameters: dict[str, object] | None = None
-    theory_regime: object | None = None
+    theory_regime: str | None = None
     theory_fit_ref: str | None = None
     theory_record: dict[str, object] | None = None
     prediction_resolution: dict[str, object] | None = None
@@ -418,7 +418,7 @@ class _SnapshotKwargs(TypedDict, total=False):
     theory_form: str | None
     theory_variables: dict[str, object] | None
     theory_parameters: dict[str, object] | None
-    theory_regime: object | None
+    theory_regime: str | None
     theory_fit_ref: str | None
     theory_record: dict[str, object] | None
     prediction_resolution: dict[str, object] | None

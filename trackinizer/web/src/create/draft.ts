@@ -17,17 +17,21 @@ import { kindLook } from "../ui/kinds";
 import { type Edit, short } from "../writes/edits";
 import { batchRequest, createRequest, type WriteRequest } from "../writes/requests";
 
-/** A kind a person can create here: every kind but AgentSession. */
-export type CreatableKind = Exclude<InquiryKind, "AgentSession">;
+/** A kind a person can create here: every kind but AgentSession and Prediction. */
+export type CreatableKind = Exclude<InquiryKind, "AgentSession" | "Prediction">;
 
 /**
  * The kinds a person can create here, by any path (a create form, or a new
  * inquiry that supersedes one): the server's, less AgentSession, which `trax
- * run` records and nobody types in (the old UI's `VIEW_ONLY_KINDS`). A kind this
+ * run` records and nobody types in (the old UI's `VIEW_ONLY_KINDS`), and
+ * Prediction, whose quantity and quantiles are frozen at registration and so
+ * are registered with trax or imported from coord, not drafted here. A kind this
  * build's schema does not name has no create body to type, so it is left out.
  */
 export function creatableKinds(kinds: readonly string[]): CreatableKind[] {
-  return kinds.filter((kind): kind is CreatableKind => isInquiryKind(kind) && kind !== "AgentSession");
+  return kinds.filter(
+    (kind): kind is CreatableKind => isInquiryKind(kind) && kind !== "AgentSession" && kind !== "Prediction",
+  );
 }
 
 /** The kind New makes from `route`: the kind it shows, when that can be created, else the first that can. */

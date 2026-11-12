@@ -364,7 +364,13 @@ export async function patchField<P extends PatchFieldPath>(
 }
 
 /** One new row in a batch, by its `kind` (`Issue`); its key is added per item. */
-export type BatchItem = WithoutActor<Omit<SubmitItem, "idempotency_key">>;
+// Distributed over the kinds: a plain `Omit` of the union keeps only the keys
+// every kind shares, which loses a kind's required fields (a Prediction's quantity).
+export type BatchItem = SubmitItem extends infer Item
+  ? Item extends unknown
+    ? WithoutActor<Omit<Item, "idempotency_key">>
+    : never
+  : never;
 
 /** One edge in a batch: a new row by `from_index` or `to_index`, an existing one by `from_id` or `to_id`. */
 export type BatchEdge = components["schemas"]["BatchEdge"];
@@ -467,4 +473,6 @@ const INQUIRY_KINDS: { readonly [Kind in InquiryKind]: true } = {
   WebResult: true,
   WebSearch: true,
   AgentSession: true,
+  Theory: true,
+  Prediction: true,
 };

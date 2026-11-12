@@ -24,7 +24,14 @@ from trackinizer.types.edges import (
     edge_topology,
 )
 from trackinizer.types.inquiries import Belief, Inquiry, Issue, Paper
-from trackinizer.wire.bodies import SubmitBelief, SubmitIssue, SubmitPaper
+from trackinizer.wire.bodies import (
+    SubmitBelief,
+    SubmitExperiment,
+    SubmitIssue,
+    SubmitPaper,
+    SubmitPrediction,
+    SubmitTheory,
+)
 from trackinizer.wire.routes import field_owner_kind
 
 
@@ -222,7 +229,27 @@ async def _one_edge_per_kind(store: Store) -> dict[str, tuple[uuid.UUID, uuid.UU
         await store.submit_paper(SubmitPaper(account=account, title=title))
         for title in ("cited", "citing")
     ]
+    theory_old, theory_new = [
+        await store.submit_theory(SubmitTheory(account=account, title=title))
+        for title in ("law", "rival law")
+    ]
+    prediction = await store.submit_prediction(
+        SubmitPrediction(
+            account=account,
+            title="forecast",
+            quantity={"key": "mae"},
+            quantiles={"q05": 1.0, "q25": 2.0, "q50": 3.0, "q75": 4.0, "q95": 5.0},
+        ),
+    )
+    experiment = await store.submit_experiment(SubmitExperiment(account=account, title="run"))
+    assumption = await store.submit_belief(SubmitBelief(account=account, title="assumed"))
     edges: dict[str, tuple[uuid.UUID, uuid.UUID]] = {
+        "predicts": (prediction, theory_old),
+        "tests": (experiment, prediction),
+        "rivals": (theory_old, theory_new),
+        "fits": (experiment, theory_old),
+        "assumes": (belief, assumption),
+        "about": (belief, theory_old),
         "narrows": (issue_new, issue_old),
         "requires": (issue_new, issue_old),
         "produced_by": (belief, issue_old),

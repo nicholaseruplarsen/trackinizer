@@ -316,7 +316,9 @@ substantial row of that kind:
 |---|---|
 | `trax-issue` | Issue / bug report (context, success criteria, verification) |
 | `trax-paper` | Paper (bib cascade, DOI, companion WebResults, `cites` vs `proves`) |
-| `trax-belief` | Belief (falsifiable claim, judgement/confidence, signed citations) |
+| `trax-belief` | Belief (falsifiable claim, judgement/confidence, signed citations, assumes/about) |
+| `trax-theory` | Theory (parametric law, fitted parameters, regime, rivals) |
+| `trax-prediction` | Prediction (quantiles frozen before the run; scored, never self-graded) |
 | `trax-experiment` | Experiment (codechanges, outcome, config, proved_by) |
 | `trax-codechange` | CodeChange (full SHA, produced-link) |
 | `trax-webresult` | WebResult (url, companion-of-paper) |

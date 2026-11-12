@@ -636,23 +636,6 @@ def _reject_nonstandard_json_constant(value: str) -> object:
     raise ValueError(f"non-standard numeric constant {value!r}")
 
 
-def _coerce_json_any(value: str) -> object:
-    """Parse a token as JSON when it is JSON, else keep it as a plain string.
-
-    ``regime`` is free text or a JSON predicate, so ``"DK1 wind, dev window"``
-    and ``{"zones": ["DK1"]}`` are both valid.
-    """
-    if value == "-" or value.startswith("@"):
-        return value
-    try:
-        return cast(
-            object,
-            json.loads(value, parse_constant=_reject_nonstandard_json_constant),
-        )
-    except ValueError:
-        return value
-
-
 def _coerce_made_by(value: str) -> str:
     if value not in get_args(cast(object, Prediction.Source.__value__)):
         raise ValueError(f"made_by is theory|agent|house-prior, not {value!r}")
@@ -679,7 +662,6 @@ _COERCE: Mapping[str, Callable[[str], object]] = {
     "parameters": _coerce_config,
     "quantity": _coerce_config,
     "quantiles": _coerce_config,
-    "regime": _coerce_json_any,
     "made_by": _coerce_made_by,
     "needs_review": _coerce_bool,
 }
@@ -779,8 +761,7 @@ _FIELDS: tuple[Field, ...] = (
         cli_name="regime",
         payload_key="regime",
         shape="scalar",
-        help="Theory: where the law holds (text or JSON)",
-        filterable=False,
+        help="Theory: where the law holds (text, or a JSON predicate as text)",
     ),
     Field(
         cli_name="fit_ref",

@@ -282,7 +282,7 @@ class SubmitTheory(SubmitBase):
     form: str | None = None
     variables: dict[str, object] | None = None
     parameters: dict[str, object] | None = None
-    regime: object | None = None
+    regime: str | None = None
     fit_ref: str | None = None
     rivals: list[uuid.UUID] = Field(default_factory=list)
     """Existing Theories this one rivals; each pair is stored once, lower seq
