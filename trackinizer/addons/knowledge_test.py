@@ -327,3 +327,25 @@ def test_reported_delta_reads_the_head_of_an_outcome(outcome: str, value: float 
     from trackinizer.addons.knowledge import reported_delta
 
     assert reported_delta(outcome) == value
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_the_prior_is_published_hourly_and_only_when_coord_would_take_it(tmp_path: Path) -> None:
+    sink = tmp_path / "published.json"
+    service = _service(tmp_path, tmp_path / "ledger.jsonl")
+    service.publish_command = ("sh", "-c", f"cat > {sink}")
+    now = datetime(2026, 11, 13, 4, 0, tzinfo=UTC)
+    prior = {"quantity_kind": "delta_pt", "quantiles": Q, "n": 238, "source": "x", "fitted_at": now.isoformat()}
+    await service.publish(prior, now=now)
+    assert json.loads(sink.read_text())["n"] == 238
+    sink.unlink()
+    await service.publish(prior, now=now + timedelta(minutes=5))
+    assert not sink.exists()
+    await service.publish(prior, now=now + timedelta(hours=1))
+    assert sink.exists()
+    service.published = None
+    await service.publish({**prior, "n": 12}, now=now + timedelta(hours=3))
+    assert service.publish_error is not None
+    service.publish_command = ("sh", "-c", "echo 'quantiles must be non-decreasing' >&2; exit 2")
+    await service.publish(prior, now=now + timedelta(hours=4))
+    assert service.publish_error == "coord refused it: quantiles must be non-decreasing"

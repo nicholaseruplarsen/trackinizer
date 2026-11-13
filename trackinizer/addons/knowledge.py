@@ -1126,11 +1126,48 @@ class KnowledgeService:
     house_prior_metric: str
     house_prior_path: Path
     interval_sec: float = 300.0
+    publish_command: tuple[str, ...] = ()
+    publish_every_sec: float = 3600.0
     name: str = "knowledge"
     description: str = "Imports coord, scores predictions, fits the house prior."
     report: ImportReport = field(default_factory=ImportReport)
     house_prior: dict[str, object] | None = None
     backtest: list[dict[str, object]] = field(default_factory=list)
+    published: datetime | None = None
+    publish_error: str | None = None
+
+    async def publish(self, prior: Mapping[str, object], *, now: datetime) -> None:
+        """Send the prior to coord at most every ``publish_every_sec``.
+
+        coord accepts it on a key that can put only this file, checks the
+        quantiles and n >= 30, and writes rs-shared/notes/house-prior.json plus a
+        dated copy, for research boxes to shrink their predictions toward.
+        """
+        if not self.publish_command:
+            return
+        if self.published and (now - self.published).total_seconds() < self.publish_every_sec:
+            return
+        if int(cast(int, prior.get("n") or 0)) < 30:
+            self.publish_error = "not published: coord takes a prior fitted on n >= 30"
+            return
+        body = json.dumps(prior, indent=1, default=str).encode()
+        try:
+            done = await asyncio.to_thread(
+                subprocess.run,
+                list(self.publish_command),
+                input=body,
+                capture_output=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as err:
+            self.publish_error = f"publish failed: {err}"[:300]
+            return
+        if done.returncode == 0:
+            self.published, self.publish_error = now, None
+        else:
+            said = (done.stderr or done.stdout).decode(errors="replace").strip().splitlines()
+            self.publish_error = f"coord refused it: {said[-1] if said else done.returncode}"[:300]
 
     async def run(self, context: ServerContext) -> None:
         """Pass every ``interval_sec`` until cancelled."""
@@ -1172,6 +1209,7 @@ class KnowledgeService:
         if prior is not None:
             self.house_prior = prior
             await asyncio.to_thread(_write_json, self.house_prior_path, prior)
+            await self.publish(prior, now=now)
         graph = await _Graph.read(store)
         await derive_native_records(store, graph, now=now)
         await propagate_review(store, graph)
@@ -1325,6 +1363,8 @@ async def summarise(
         "calibration": calibration(scored, groups=("source", "author", "origin")),
         "house_prior": {
             "prior": service.house_prior if service else None,
+            "published": service.published.isoformat() if service and service.published else None,
+            "publish_error": service.publish_error if service else None,
             "backtest": calibration(backtest, groups=("source",))["all"],
         },
         "beliefs": stale,
@@ -1366,6 +1406,16 @@ class Knowledge:
         house_prior_path: str = "~/.cache/trackinizer/house-prior.json"
         """Where the current prior is written, in the ``rs-shared/notes/house-prior.json`` shape."""
 
+        publish_command: tuple[str, ...] = (
+            "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+            "coord-notes", "put", "house-prior.json",
+        )
+        """Run with the prior on stdin to publish it to rs-shared/notes/ through
+        coord (a key that can put only that file); empty turns publishing off."""
+
+        publish_every_sec: float = 3600.0
+        """How often the prior is published."""
+
         interval_sec: float = 300.0
         """Seconds between passes."""
 
@@ -1385,6 +1435,8 @@ class Knowledge:
             house_prior_metric=config.house_prior_metric,
             house_prior_path=Path(config.house_prior_path).expanduser(),
             interval_sec=config.interval_sec,
+            publish_command=config.publish_command,
+            publish_every_sec=config.publish_every_sec,
         )
         router = APIRouter()
 
